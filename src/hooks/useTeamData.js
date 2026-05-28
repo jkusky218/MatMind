@@ -231,6 +231,56 @@ export function useTeamData(auth) {
     return () => { realtimeChannel?.unsubscribe(); };
   }, [teamId]);
 
+  // ── createEvent ─────────────────────────────────────────────────────────────
+  const createEvent = useCallback(async ({ title, type = 'practice', date, time, location = 'Lovett Gym', group = 'all' }) => {
+    const tempId = `local-${Date.now()}`;
+    const normalized = { id: tempId, title, type, date, time, location, group };
+    setEvents(prev => [...prev, normalized]);
+
+    if (isDemo || !supabase || !teamId) return;
+
+    // Convert "6:00 PM" → "18:00:00" for Postgres TIME column
+    const toSQLTime = (t) => {
+      if (!t) return null;
+      const m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!m) return null;
+      let h = parseInt(m[1]);
+      if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+      if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+      return `${String(h).padStart(2, '0')}:${m[2]}:00`;
+    };
+
+    const { data: row, error } = await supabase.from('events').insert({
+      team_id: teamId,
+      title,
+      event_type: type,
+      event_date: date,
+      start_time: toSQLTime(time),
+      location_name: location,
+      roster_group: group === 'all' ? null : group,
+      created_by: auth.user?.id ?? null,
+    }).select('id').single();
+
+    if (!error && row?.id) {
+      // Replace temp ID with real UUID
+      setEvents(prev => prev.map(e => e.id === tempId ? { ...e, id: row.id } : e));
+    }
+  }, [auth, teamId]);
+
+  // ── updateAvailabilityEntry ──────────────────────────────────────────────────
+  const updateAvailabilityEntry = useCallback(async (athleteId, eventId, status) => {
+    const key = `${athleteId}-${eventId}`;
+    setAvailability(prev => ({ ...prev, [key]: status }));
+
+    if (isDemo || !supabase) return;
+
+    await supabase.from('availability').upsert({
+      event_id: eventId,
+      athlete_id: athleteId,
+      status,
+    }, { onConflict: 'event_id,athlete_id' });
+  }, []);
+
   // ── sendMessage ─────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (channelSlug, text) => {
     const senderName = auth.profile?.full_name ?? 'Coach';
@@ -276,6 +326,8 @@ export function useTeamData(auth) {
     setAvailability,
     channelMessages,
     sendMessage,
+    createEvent,
+    updateAvailabilityEntry,
     loading,
     isDemo,
   };

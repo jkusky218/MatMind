@@ -6,6 +6,7 @@ import ChannelList   from '../components/ChannelList';
 import ChannelThread from '../components/ChannelThread';
 import ScheduleTab   from '../components/ScheduleTab';
 import RosterTab     from '../components/RosterTab';
+import AdminPanel    from '../components/AdminPanel';
 
 const TABS = [
   { id: 'messages', label: 'Messages', Icon: Chat },
@@ -16,14 +17,41 @@ const TABS = [
 export default function MainApp({ auth }) {
   const [tab, setTab]                 = useState('messages');
   const [activeChannel, setActiveChannel] = useState(null);
+  const [adminOpen, setAdminOpen]     = useState(false);
 
   const {
     roster, setRoster,
     events, setEvents,
     availability, setAvailability,
     channelMessages, sendMessage,
+    createEvent, updateAvailabilityEntry,
     loading, isDemo,
   } = useTeamData(auth);
+
+  const isCoach = auth.profile?.role === 'coach' || auth.profile?.role === 'admin' || !auth.profile;
+
+  function handleMemberAdded({ type, data }) {
+    if (type === 'coach' && data) {
+      // The admin API returns the coaches row; the profile has the full_name but
+      // we don't get it back here — just push a placeholder so the count updates.
+      // The name will be correct on next page load / data refresh.
+      setRoster(prev => {
+        // Avoid duplicates if the person was already in the list
+        if (prev.some(m => m.id === data.id)) return prev;
+        return [...prev, {
+          id: data.id,
+          name: 'New Coach',         // refreshed on next load when profile is fetched
+          weight: null, grade: null,
+          school: 'Lovett',
+          group: data.roster_group ?? 'coaches',
+          role: data.title ?? 'Coach',
+          parent1: null, parent2: null,
+        }];
+      });
+    }
+    // Athletes: the API returns the new row ID but we'd need a full refetch to get
+    // parent data. A page refresh will show the new athlete correctly.
+  }
 
   if (loading) {
     return (
@@ -81,8 +109,17 @@ export default function MainApp({ auth }) {
               {UserIcon(12, BRAND.columbiaMid)}
               <span style={{ textTransform: 'capitalize' }}>{auth.profile?.role ?? 'coach'}</span>
             </div>
+            {isCoach && (
+              <button onClick={() => setAdminOpen(true)} title="Add team member" style={{
+                background: 'rgba(107,173,228,0.18)', border: '1px solid rgba(107,173,228,0.3)',
+                borderRadius: 8, padding: '5px 9px', fontSize: 16, color: BRAND.columbia,
+                cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center',
+              }}>
+                +
+              </button>
+            )}
             <button onClick={auth.signOut} style={{
-              marginLeft: 8, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
+              marginLeft: 2, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
               padding: '5px 10px', fontSize: 11, color: BRAND.columbiaMid, cursor: 'pointer',
             }}>
               Sign out
@@ -109,6 +146,13 @@ export default function MainApp({ auth }) {
         </div>
       )}
 
+      {/* ── Admin panel ── */}
+      <AdminPanel
+        open={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        onMemberAdded={handleMemberAdded}
+      />
+
       {/* ── Content ── */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {activeChannel ? (
@@ -123,6 +167,8 @@ export default function MainApp({ auth }) {
             setRoster={setRoster}
             setEvents={setEvents}
             setAvailability={setAvailability}
+            createEvent={createEvent}
+            updateAvailabilityEntry={updateAvailabilityEntry}
             senderName={auth.profile?.full_name}
             userRole={auth.profile?.role ?? 'coach'}
           />
