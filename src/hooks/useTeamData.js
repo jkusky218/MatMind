@@ -101,12 +101,18 @@ export function useTeamData(auth) {
 
   // ── Supabase mode ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (isDemo || !supabase || !teamId) return;
+    if (isDemo || !supabase) return;
+    if (!teamId) {
+      // Profile loaded but no team assigned — don't hang
+      setLoading(false);
+      return;
+    }
 
     let realtimeChannel;
 
     async function load() {
       setLoading(true);
+      try {
 
       // Athletes
       const { data: athleteRows } = await supabase
@@ -200,7 +206,11 @@ export function useTeamData(auth) {
         setChannelMessages({ ai: [] });
       }
 
-      setLoading(false);
+      } catch (err) {
+        console.error('MatMind: failed to load team data', err);
+      } finally {
+        setLoading(false);
+      }
 
       // Realtime subscription for new messages
       realtimeChannel = supabase
