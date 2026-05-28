@@ -124,6 +124,7 @@ export default function MainApp({ auth }) {
             setEvents={setEvents}
             setAvailability={setAvailability}
             senderName={auth.profile?.full_name}
+            userRole={auth.profile?.role ?? 'coach'}
           />
         ) : (
           <>

@@ -9,13 +9,14 @@ const AI_ENDPOINT = '/api/chat';
  * @param {object} context - Team context (roster, events, availability, etc.)
  * @returns {Promise<{text: string, actions: string[], followUp: string|null}>}
  */
-export async function sendToMatMind(message, context = {}) {
+export async function sendToMatMind(message, context = {}, history = []) {
   try {
     const response = await fetch(AI_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message,
+        history,
         roster: context.roster || [],
         events: context.events || [],
         availability: context.availability || {},
