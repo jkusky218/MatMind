@@ -23,6 +23,7 @@ export default function MainApp({ auth }) {
     roster, setRoster,
     events, setEvents,
     availability, setAvailability,
+    attendance, recordAttendance,
     channelMessages, sendMessage,
     createEvent, updateAvailabilityEntry,
     loading, isDemo,
@@ -184,7 +185,10 @@ export default function MainApp({ auth }) {
               <ScheduleTab
                 events={events}
                 availability={availability}
+                attendance={attendance}
+                recordAttendance={recordAttendance}
                 roster={roster}
+                isCoach={isCoach}
               />
             )}
             {tab === 'roster' && (
