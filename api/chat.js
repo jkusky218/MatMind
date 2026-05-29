@@ -65,6 +65,7 @@ export default async function handler(req, res) {
       text,
       actions,
       followUp,
+      intents,
       usage: {
         input_tokens: data.usage?.input_tokens,
         output_tokens: data.usage?.output_tokens,
@@ -133,24 +134,51 @@ AVAILABILITY SUMMARY:
 ${availSummary}
 
 RESPONSE FORMAT:
-Respond naturally and conversationally. When you take actions, list them clearly. Keep responses concise — coaches are busy.
+Respond naturally and conversationally. Keep responses concise — coaches are busy.
 
 When reporting actions you've taken, format them as a list starting with "✅" for each completed action.
 If there's a follow-up question or suggestion, put it on its own line starting with "💡".
 
-Example:
-"Done! I've handled it:
-✅ Marked Marcus as unavailable for Peach State Tournament
-✅ Notified Darnell Johnson via text
-✅ 126 lb slot is now open
+DATA ACTIONS — CRITICAL:
+When a coach asks you to add events/practices or update availability, you MUST emit a machine-readable action block as the very last thing in your response, on its own line, with no text after it. Use this exact JSON format:
 
-💡 Want me to check who else in Advanced could fill the 126 lb slot?"
+{"intents":[{"type":"create_event","title":"TITLE","date":"YYYY-MM-DD","time":"H:MM AM/PM","location":"LOCATION","group":"GROUP"}]}
+
+Rules for the intents block:
+- Valid groups: "all", "advanced", "beginner", "tots", "coaches". Use "all" when it applies to everyone.
+- If an event targets MULTIPLE specific groups (e.g. "Beginner and Advanced"), output ONE intent per group for each date.
+- For recurring events (e.g. "every Monday in June"), output one intent per occurrence date.
+- Calculate exact YYYY-MM-DD calendar dates from today's date (shown below). Do not use relative terms like "next Monday" — compute the actual date.
+- "6:30 PM" and "18:30" are both valid time formats.
+- If no data change is needed, omit the intents block entirely — do NOT output empty intents.
+- The intents block must be valid JSON. Output it as a single line with no surrounding markdown.
+
+Example for "add practice every Tuesday in June for Tots":
+{"intents":[{"type":"create_event","title":"Tuesday Practice","date":"2026-06-02","time":"5:00 PM","location":"Lovett Gym","group":"tots"},{"type":"create_event","title":"Tuesday Practice","date":"2026-06-09","time":"5:00 PM","location":"Lovett Gym","group":"tots"},{"type":"create_event","title":"Tuesday Practice","date":"2026-06-16","time":"5:00 PM","location":"Lovett Gym","group":"tots"},{"type":"create_event","title":"Tuesday Practice","date":"2026-06-23","time":"5:00 PM","location":"Lovett Gym","group":"tots"},{"type":"create_event","title":"Tuesday Practice","date":"2026-06-30","time":"5:00 PM","location":"Lovett Gym","group":"tots"}]}
 
 Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
 }
 
 function parseAIResponse(rawText) {
-  const lines = rawText.split('\n');
+  // Extract structured intents JSON block (Claude emits it as the last line)
+  let intents = [];
+  let textWithoutIntents = rawText;
+
+  const intentMatch = rawText.match(/\{"intents"\s*:\s*\[[\s\S]*?\]\s*\}/);
+  if (intentMatch) {
+    try {
+      const parsed = JSON.parse(intentMatch[0]);
+      if (Array.isArray(parsed.intents)) {
+        intents = parsed.intents;
+      }
+    } catch (e) {
+      console.warn('MatMind: failed to parse intents JSON:', e.message);
+    }
+    // Remove the JSON block from the visible text
+    textWithoutIntents = rawText.replace(intentMatch[0], '').trim();
+  }
+
+  const lines = textWithoutIntents.split('\n');
   const actions = [];
   const textLines = [];
   let followUp = null;
@@ -170,5 +198,6 @@ function parseAIResponse(rawText) {
     text: textLines.join('\n').trim(),
     actions,
     followUp,
+    intents,
   };
 }

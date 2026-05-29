@@ -42,6 +42,7 @@ export async function sendToMatMind(message, context = {}, history = []) {
       text: data.text || "I couldn't process that. Could you rephrase?",
       actions: data.actions || [],
       followUp: data.followUp || null,
+      intents: data.intents || [],
       usage: data.usage,
       error: false,
     };

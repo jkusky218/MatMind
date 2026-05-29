@@ -4,10 +4,49 @@ import { Brain, Send, ChevLeft, Lock, ICON_MAP } from './Icons';
 import ChatBubble from './ChatBubble';
 import { sendToMatMind } from '../lib/ai';
 
-// ── Intent detection ──────────────────────────────────────────────────────────
-// Runs on every coach message to detect and immediately execute data mutations.
-// This fires BEFORE the Claude API call so the state is always updated even
-// if Claude only returns conversational text.
+// ── Claude intent execution ───────────────────────────────────────────────────
+// After Claude responds, it may include a structured intents array.
+// We execute those here so the actual data mutations match what Claude describes.
+
+const VALID_GROUPS = new Set(['all', 'advanced', 'beginner', 'tots', 'coaches']);
+
+async function executeClaudeIntents(intents, { createEvent, updateAvailabilityEntry, roster, events }) {
+  if (!intents?.length) return { succeeded: 0, errors: [] };
+  const errors = [];
+  let succeeded = 0;
+
+  for (const intent of intents) {
+    if (intent.type === 'create_event' && createEvent) {
+      // Validate required fields
+      if (!intent.date || !/^\d{4}-\d{2}-\d{2}$/.test(intent.date)) {
+        errors.push(`Skipped "${intent.title}": missing or invalid date (got "${intent.date}")`);
+        continue;
+      }
+      const group = VALID_GROUPS.has(intent.group) ? intent.group : 'all';
+      console.log('[MatMind] Claude intent → create_event:', intent.title, intent.date, intent.time, group);
+      const result = await createEvent({
+        title: intent.title || 'Practice',
+        type: intent.eventType || 'practice',
+        date: intent.date,
+        time: intent.time || '6:00 PM',
+        location: intent.location || 'Lovett Gym',
+        group,
+      });
+      if (result?.ok === false) {
+        errors.push(`"${intent.title}" (${intent.date}): ${result.error}`);
+      } else {
+        succeeded++;
+      }
+    }
+    // Future: mark_unavailable, send_message, etc.
+  }
+
+  return { succeeded, errors };
+}
+
+// ── Regex intent detection (offline fallback only) ────────────────────────────
+// Used when the Claude API is unreachable. When Claude IS reachable, Claude
+// emits structured intents itself and we skip this entirely.
 
 function detectGroup(text) {
   if (text.includes('coaches') || text.includes('coaching staff')) return 'coaches';
@@ -242,23 +281,7 @@ export default function ChannelThread({
       setAiMsgs(prev => [...prev, userMsg]);
       setTyping(true);
 
-      // ── 1. Execute mutations immediately (always fires, API-independent) ────
-      const { applied, errors } = await executeIntents(text, { roster, events, createEvent, updateAvailabilityEntry });
-
-      // If a mutation error occurred, show it immediately without waiting for Claude
-      if (errors.length > 0) {
-        const errMsg = {
-          id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', time: 'Now',
-          text: '⚠️ Something went wrong saving your changes:',
-          actions: errors,
-          followUp: 'Check your connection or contact your admin if this keeps happening.',
-        };
-        setAiMsgs(prev => [...prev, errMsg]);
-        setTyping(false);
-        return;
-      }
-
-      // ── 2. Get conversational response from Claude ───────────────────────
+      // ── 1. Get Claude's response (it includes structured intents when needed) ──
       const resp = await sendToMatMind(
         text,
         { roster, events, availability, userRole: userRole ?? 'coach', userName: senderName ?? 'Coach' },
@@ -267,11 +290,36 @@ export default function ChannelThread({
 
       let aiMsg;
       if (resp.error) {
-        // Offline fallback — just the conversational text, mutations already done above
+        // ── Offline fallback: use regex detection + local response ─────────
+        const { applied, errors } = await executeIntents(text, { roster, events, createEvent, updateAvailabilityEntry });
         const fallback = generateFallbackResponse(text, roster, events, availability);
-        aiMsg = { id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', ...fallback, time: 'Now' };
+        if (errors.length > 0) {
+          aiMsg = {
+            id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', time: 'Now',
+            text: '⚠️ Could not save changes to the database:',
+            actions: errors,
+            followUp: 'Check your connection or contact your admin.',
+          };
+        } else {
+          aiMsg = { id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', ...fallback, time: 'Now' };
+        }
       } else {
-        aiMsg = { id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', ...resp, time: 'Now' };
+        // ── 2. Execute Claude's structured intents ────────────────────────
+        const { succeeded, errors } = await executeClaudeIntents(
+          resp.intents,
+          { createEvent, updateAvailabilityEntry, roster, events },
+        );
+
+        // If any intents failed, append a warning to the response
+        let augmentedMsg = { id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', ...resp, time: 'Now' };
+        if (errors.length > 0) {
+          augmentedMsg = {
+            ...augmentedMsg,
+            followUp: `⚠️ Some changes couldn't be saved: ${errors.join('; ')}`,
+          };
+        }
+        aiMsg = augmentedMsg;
+
         setHistory(prev => [
           ...prev,
           { role: 'user',      content: text },
