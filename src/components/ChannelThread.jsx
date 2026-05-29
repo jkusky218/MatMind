@@ -19,14 +19,27 @@ function detectGroup(text) {
 
 function getNextWeekdayDate(dayName) {
   const DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  const target  = DAYS.indexOf(dayName.toLowerCase());
-  if (target === -1) return new Date().toISOString().slice(0, 10);
-  const today = new Date();
+  const target = DAYS.indexOf(dayName.toLowerCase());
+  const today  = new Date();
+  if (target === -1) {
+    // "tomorrow" shortcut
+    if (dayName.toLowerCase() === 'tomorrow') {
+      const t = new Date(today);
+      t.setDate(today.getDate() + 1);
+      return localDateStr(t);
+    }
+    return localDateStr(today);
+  }
   let diff = target - today.getDay();
   if (diff <= 0) diff += 7;
   const d = new Date(today);
   d.setDate(today.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  return localDateStr(d);
+}
+
+/** Returns YYYY-MM-DD using LOCAL date components (avoids UTC timezone shift). */
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 async function executeIntents(message, { roster, events, createEvent, updateAvailabilityEntry }) {
@@ -35,21 +48,25 @@ async function executeIntents(message, { roster, events, createEvent, updateAvai
   const applied  = [];
 
   // ── Add event / practice ───────────────────────────────────────────────────
-  const isAddEvent = lower.includes('add practice') || lower.includes('schedule practice')
-    || lower.includes('new practice') || lower.includes('add event');
+  const isAddEvent =
+    /\b(add|create|schedule|put|set up|make)\s+(a\s+|the\s+|new\s+)?practice\b/.test(lower) ||
+    /\b(add|create|schedule)\s+(a\s+|the\s+|new\s+)?event\b/.test(lower) ||
+    lower.includes('new practice');
 
   if (isAddEvent && createEvent) {
-    const dayMatch  = lower.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
+    const dayMatch  = lower.match(/(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
     const timeMatch = lower.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i);
     const group     = detectGroup(lower) ?? 'all';
-    const day       = dayMatch  ? dayMatch[1].charAt(0).toUpperCase() + dayMatch[1].slice(1) : 'Thursday';
+    const day       = dayMatch ? dayMatch[1].charAt(0).toUpperCase() + dayMatch[1].slice(1) : 'Thursday';
     const timeRaw   = timeMatch ? timeMatch[1] : '6:00 PM';
     // Normalise "6pm" → "6:00 PM"
-    const time      = timeRaw.replace(/(\d+)(am|pm)/i, (_, h, ap) => `${h}:00 ${ap.toUpperCase()}`)
-                             .replace(/(\d+:\d+)\s*(am|pm)/i, (_, t, ap) => `${t} ${ap.toUpperCase()}`);
-    const date      = dayMatch ? getNextWeekdayDate(day) : new Date().toISOString().slice(0, 10);
-    await createEvent({ title: `${day} Practice`, type: 'practice', date, time, location: 'Lovett Gym', group });
-    applied.push(`Added ${day} Practice at ${time}`);
+    const time = timeRaw
+      .replace(/(\d+)(am|pm)/i, (_, h, ap) => `${h}:00 ${ap.toUpperCase()}`)
+      .replace(/(\d+:\d+)\s*(am|pm)/i, (_, t, ap) => `${t} ${ap.toUpperCase()}`);
+    const date = dayMatch ? getNextWeekdayDate(day) : localDateStr(new Date());
+    const label = day === 'Tomorrow' ? 'Practice' : `${day} Practice`;
+    await createEvent({ title: label, type: 'practice', date, time, location: 'Lovett Gym', group });
+    applied.push(`Added ${label} at ${time}`);
   }
 
   // ── Mark athlete unavailable ────────────────────────────────────────────────
@@ -120,13 +137,14 @@ function generateFallbackResponse(message, roster, events, availability) {
     }
   }
 
-  if (lower.includes('add practice') || lower.includes('schedule practice') || lower.includes('new practice')) {
-    const dayMatch = lower.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
+  if (/\b(add|create|schedule|put|set up|make)\s+(a\s+|the\s+|new\s+)?practice\b/.test(lower) || lower.includes('new practice')) {
+    const dayMatch = lower.match(/(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
     const day = dayMatch ? dayMatch[1].charAt(0).toUpperCase() + dayMatch[1].slice(1) : 'Thursday';
     const group = detectGroup(lower) ?? 'all';
+    const label = day === 'Tomorrow' ? 'Practice' : `${day} Practice`;
     return {
       text: 'Practice added to the schedule!',
-      actions: [`Added ${day} Practice`, `Group: ${group === 'all' ? 'All groups' : GROUP_LABELS[group]}`],
+      actions: [`Added ${label}`, `Group: ${group === 'all' ? 'All groups' : GROUP_LABELS[group]}`],
       followUp: 'Want me to post an announcement to the channel?',
     };
   }

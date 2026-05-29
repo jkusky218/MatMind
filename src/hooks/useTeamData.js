@@ -261,7 +261,11 @@ export function useTeamData(auth) {
       created_by: auth.user?.id ?? null,
     }).select('id').single();
 
-    if (!error && row?.id) {
+    if (error) {
+      console.error('MatMind: event insert failed', error.message, error);
+      // Remove the optimistic entry so the UI doesn't show a ghost event
+      setEvents(prev => prev.filter(e => e.id !== tempId));
+    } else if (row?.id) {
       // Replace temp ID with real UUID
       setEvents(prev => prev.map(e => e.id === tempId ? { ...e, id: row.id } : e));
     }
