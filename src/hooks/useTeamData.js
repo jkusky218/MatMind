@@ -80,6 +80,7 @@ export function useTeamData(auth) {
   const [roster, setRoster] = useState([]);
   const [events, setEvents] = useState([]);
   const [availability, setAvailability] = useState({});
+  const [attendance, setAttendance] = useState({});
   const [channelMessages, setChannelMessages] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -95,6 +96,7 @@ export function useTeamData(auth) {
     setRoster(INITIAL_ROSTER);
     setEvents(INITIAL_EVENTS);
     setAvailability(INITIAL_AVAILABILITY);
+    setAttendance({});          // no prior attendance in demo — coach takes it live
     setChannelMessages(INITIAL_CHANNEL_MESSAGES);
     setLoading(false);
   }, []);
@@ -151,19 +153,32 @@ export function useTeamData(auth) {
       const normalizedEvents = (eventRows ?? []).map(normalizeEvent);
       setEvents(normalizedEvents);
 
-      // Availability
+      // Availability + Attendance (fetched together for the same event IDs)
       if (normalizedEvents.length > 0) {
         const eventIds = normalizedEvents.map(e => e.id);
-        const { data: availRows } = await supabase
-          .from('availability')
-          .select('event_id, athlete_id, status')
-          .in('event_id', eventIds);
+
+        const [{ data: availRows }, { data: attendRows }] = await Promise.all([
+          supabase
+            .from('availability')
+            .select('event_id, athlete_id, status')
+            .in('event_id', eventIds),
+          supabase
+            .from('attendance')
+            .select('event_id, athlete_id, status')
+            .in('event_id', eventIds),
+        ]);
 
         const availMap = {};
         (availRows ?? []).forEach(row => {
           availMap[`${row.athlete_id}-${row.event_id}`] = row.status;
         });
         setAvailability(availMap);
+
+        const attendMap = {};
+        (attendRows ?? []).forEach(row => {
+          attendMap[`${row.athlete_id}-${row.event_id}`] = row.status;
+        });
+        setAttendance(attendMap);
       }
 
       // Channels + messages
@@ -301,6 +316,38 @@ export function useTeamData(auth) {
     }, { onConflict: 'event_id,athlete_id' });
   }, []);
 
+  // ── recordAttendance ────────────────────────────────────────────────────────
+  // status: 'present' | 'absent'
+  // Optimistically updates local state, then upserts to Supabase.
+  const recordAttendance = useCallback(async (athleteId, eventId, status) => {
+    const key = `${athleteId}-${eventId}`;
+
+    // Optimistic update
+    setAttendance(prev => ({ ...prev, [key]: status }));
+
+    if (isDemo || !supabase) return { ok: true };
+
+    const { error } = await supabase.from('attendance').upsert({
+      event_id:    eventId,
+      athlete_id:  athleteId,
+      status,
+      recorded_by: auth.user?.id ?? null,
+      recorded_at: new Date().toISOString(),
+    }, { onConflict: 'event_id,athlete_id' });
+
+    if (error) {
+      console.error('MatMind: attendance upsert failed', error.message, error);
+      // Roll back the optimistic update
+      setAttendance(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  }, [auth]);
+
   // ── sendMessage ─────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (channelSlug, text) => {
     const senderName = auth.profile?.full_name ?? 'Coach';
@@ -344,6 +391,9 @@ export function useTeamData(auth) {
     setEvents,
     availability,
     setAvailability,
+    attendance,
+    setAttendance,
+    recordAttendance,
     channelMessages,
     sendMessage,
     createEvent,
