@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     const aiText = data.content?.[0]?.text || 'Sorry, I couldn\'t process that. Try again?';
 
     // Parse actions from AI response (AI returns them in a structured format)
-    const { text, actions, followUp } = parseAIResponse(aiText);
+    const { text, actions, followUp, intents } = parseAIResponse(aiText);
 
     return res.status(200).json({
       text,
