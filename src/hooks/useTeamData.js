@@ -239,11 +239,25 @@ export function useTeamData(auth) {
 
     if (isDemo || !supabase || !teamId) return;
 
-    // Convert "6:00 PM" → "18:00:00" for Postgres TIME column
+    // Convert any common time string → "HH:MM:00" for Postgres TIME column.
+    // Falls back to 18:00:00 (6 PM) rather than null to satisfy the NOT NULL constraint.
     const toSQLTime = (t) => {
-      if (!t) return null;
-      const m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-      if (!m) return null;
+      if (!t) return '18:00:00';
+      const s = t.trim()
+        // "6 PM" / "6 AM" → "6:00 PM"
+        .replace(/^(\d{1,2})\s+(AM|PM)$/i, '$1:00 $2')
+        // "6pm" → "6:00 PM"
+        .replace(/^(\d{1,2})(am|pm)$/i, (_, h, ap) => `${h}:00 ${ap.toUpperCase()}`)
+        // "6:30pm" → "6:30 PM"
+        .replace(/(\d{1,2}:\d{2})(am|pm)/i, (_, t, ap) => `${t} ${ap.toUpperCase()}`);
+      const m = s.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!m) {
+        // Try 24-hour format: "18:00" or "18:00:00"
+        const m24 = t.match(/^(\d{1,2}):(\d{2})/);
+        if (m24) return `${String(parseInt(m24[1])).padStart(2, '0')}:${m24[2]}:00`;
+        console.warn('MatMind: could not parse time, defaulting to 18:00:00:', t);
+        return '18:00:00';
+      }
       let h = parseInt(m[1]);
       if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
       if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
@@ -265,10 +279,12 @@ export function useTeamData(auth) {
       console.error('MatMind: event insert failed', error.message, error);
       // Remove the optimistic entry so the UI doesn't show a ghost event
       setEvents(prev => prev.filter(e => e.id !== tempId));
+      return { ok: false, error: error.message };
     } else if (row?.id) {
       // Replace temp ID with real UUID
       setEvents(prev => prev.map(e => e.id === tempId ? { ...e, id: row.id } : e));
     }
+    return { ok: true };
   }, [auth, teamId]);
 
   // ── updateAvailabilityEntry ──────────────────────────────────────────────────

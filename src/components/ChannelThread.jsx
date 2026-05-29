@@ -46,6 +46,7 @@ async function executeIntents(message, { roster, events, createEvent, updateAvai
   const lower    = message.toLowerCase();
   const athletes = roster.filter(r => r.group !== 'coaches');
   const applied  = [];
+  const errors   = [];
 
   // ── Add event / practice ───────────────────────────────────────────────────
   const isAddEvent =
@@ -59,14 +60,20 @@ async function executeIntents(message, { roster, events, createEvent, updateAvai
     const group     = detectGroup(lower) ?? 'all';
     const day       = dayMatch ? dayMatch[1].charAt(0).toUpperCase() + dayMatch[1].slice(1) : 'Thursday';
     const timeRaw   = timeMatch ? timeMatch[1] : '6:00 PM';
-    // Normalise "6pm" → "6:00 PM"
+    // Normalise "6pm" / "6 PM" → "6:00 PM"
     const time = timeRaw
+      .replace(/^(\d{1,2})\s+(AM|PM)$/i, '$1:00 $2')
       .replace(/(\d+)(am|pm)/i, (_, h, ap) => `${h}:00 ${ap.toUpperCase()}`)
       .replace(/(\d+:\d+)\s*(am|pm)/i, (_, t, ap) => `${t} ${ap.toUpperCase()}`);
-    const date = dayMatch ? getNextWeekdayDate(day) : localDateStr(new Date());
+    const date  = dayMatch ? getNextWeekdayDate(day) : localDateStr(new Date());
     const label = day === 'Tomorrow' ? 'Practice' : `${day} Practice`;
-    await createEvent({ title: label, type: 'practice', date, time, location: 'Lovett Gym', group });
-    applied.push(`Added ${label} at ${time}`);
+    console.log('[MatMind] createEvent:', { label, date, time, group });
+    const result = await createEvent({ title: label, type: 'practice', date, time, location: 'Lovett Gym', group });
+    if (result?.ok === false) {
+      errors.push(`Could not save ${label} to the database: ${result.error}`);
+    } else {
+      applied.push(`Added ${label} at ${time}`);
+    }
   }
 
   // ── Mark athlete unavailable ────────────────────────────────────────────────
@@ -88,7 +95,7 @@ async function executeIntents(message, { roster, events, createEvent, updateAvai
     }
   }
 
-  return applied;
+  return { applied, errors };
 }
 
 // ── Offline / demo fallback AI ────────────────────────────────────────────────
@@ -236,7 +243,20 @@ export default function ChannelThread({
       setTyping(true);
 
       // ── 1. Execute mutations immediately (always fires, API-independent) ────
-      await executeIntents(text, { roster, events, createEvent, updateAvailabilityEntry });
+      const { applied, errors } = await executeIntents(text, { roster, events, createEvent, updateAvailabilityEntry });
+
+      // If a mutation error occurred, show it immediately without waiting for Claude
+      if (errors.length > 0) {
+        const errMsg = {
+          id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', time: 'Now',
+          text: '⚠️ Something went wrong saving your changes:',
+          actions: errors,
+          followUp: 'Check your connection or contact your admin if this keeps happening.',
+        };
+        setAiMsgs(prev => [...prev, errMsg]);
+        setTyping(false);
+        return;
+      }
 
       // ── 2. Get conversational response from Claude ───────────────────────
       const resp = await sendToMatMind(
