@@ -1,8 +1,7 @@
 // MatMind AI Chat — Vercel Serverless Function
-// Calls Claude Haiku 4.5 with team context via prompt caching
+// Calls Claude Haiku 4.5 with team context via prompt caching + tool use
 
 export default async function handler(req, res) {
-  // CORS headers for frontend
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -11,13 +10,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { message, history = [], roster, events, availability, channels, userRole, userName } = req.body;
-
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
-  // Build the system prompt with team context (this gets cached)
   const systemPrompt = buildSystemPrompt({ roster, events, availability, channels, userRole, userName });
 
   try {
@@ -27,10 +24,13 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
+        tools: [buildScheduleTool()],
+        tool_choice: { type: 'auto' },
         system: [
           {
             type: 'text',
@@ -39,7 +39,6 @@ export default async function handler(req, res) {
           },
         ],
         messages: [
-          // Prior turns (alternating user/assistant), capped at last 10 to keep tokens low
           ...(history || []).slice(-10),
           { role: 'user', content: message },
         ],
@@ -56,10 +55,38 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    const aiText = data.content?.[0]?.text || 'Sorry, I couldn\'t process that. Try again?';
 
-    // Parse actions from AI response (AI returns them in a structured format)
-    const { text, actions, followUp, intents } = parseAIResponse(aiText);
+    // Claude may return a mix of text blocks and tool_use blocks
+    let aiText = '';
+    let intents = [];
+
+    for (const block of (data.content || [])) {
+      if (block.type === 'text') {
+        aiText += block.text;
+      } else if (block.type === 'tool_use' && block.name === 'schedule_events') {
+        // Tool call is structured and validated — far more reliable than in-text JSON
+        intents = (block.input?.events || []).map(e => ({
+          type: 'create_event',
+          title: e.title,
+          date: e.date,
+          time: e.time,
+          location: e.location || 'Lovett Gym',
+          group: e.group || 'all',
+          eventType: e.eventType || 'practice',
+        }));
+      }
+    }
+
+    // If Claude only returned a tool call with no text, synthesise a short reply
+    if (!aiText.trim() && intents.length > 0) {
+      const groups = [...new Set(intents.map(i => i.group))];
+      const dates  = [...new Set(intents.map(i => i.date))];
+      aiText = `Done! I've added **${dates.length} practice session${dates.length !== 1 ? 's' : ''}** to the schedule`;
+      if (groups.length === 1 && groups[0] !== 'all') aiText += ` for the ${groups[0]} group`;
+      aiText += '.';
+    }
+
+    const { text, actions, followUp } = parseAIResponse(aiText);
 
     return res.status(200).json({
       text,
@@ -67,9 +94,9 @@ export default async function handler(req, res) {
       followUp,
       intents,
       usage: {
-        input_tokens: data.usage?.input_tokens,
+        input_tokens:  data.usage?.input_tokens,
         output_tokens: data.usage?.output_tokens,
-        cache_read: data.usage?.cache_read_input_tokens,
+        cache_read:    data.usage?.cache_read_input_tokens,
         cache_creation: data.usage?.cache_creation_input_tokens,
       },
     });
@@ -79,9 +106,54 @@ export default async function handler(req, res) {
   }
 }
 
-function buildSystemPrompt({ roster = [], events = [], availability = {}, channels = [], userRole = 'coach', userName = 'Coach' }) {
+// ── Tool definition ──────────────────────────────────────────────────────────
+
+function buildScheduleTool() {
+  return {
+    name: 'schedule_events',
+    description:
+      'Add one or more events to the Lovett Wrestling schedule. ' +
+      'Call this whenever the coach asks to create, add, or schedule any practice, match, tournament, or other event. ' +
+      'For recurring events (e.g. "every Monday in June") include one object per occurrence with exact YYYY-MM-DD dates. ' +
+      'For events targeting multiple groups (e.g. "Beginner and Advanced") include a separate object per group per date.',
+    input_schema: {
+      type: 'object',
+      required: ['events'],
+      properties: {
+        events: {
+          type: 'array',
+          description: 'List of individual event occurrences to create.',
+          items: {
+            type: 'object',
+            required: ['title', 'date', 'time', 'group'],
+            properties: {
+              title:     { type: 'string', description: 'Event title, e.g. "Monday Practice"' },
+              date:      { type: 'string', description: 'Exact date in YYYY-MM-DD format. Always calculate from today\'s date.' },
+              time:      { type: 'string', description: 'Start time, e.g. "6:30 PM" or "18:30"' },
+              location:  { type: 'string', description: 'Location name, e.g. "Murray Athletic Center"' },
+              group: {
+                type: 'string',
+                enum: ['all', 'advanced', 'beginner', 'tots', 'coaches'],
+                description: 'Roster group. Use "all" if no group specified. For multiple groups make separate entries.',
+              },
+              eventType: {
+                type: 'string',
+                enum: ['practice', 'match', 'tournament', 'meeting', 'other'],
+                description: 'Type of event. Defaults to practice.',
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+// ── System prompt ────────────────────────────────────────────────────────────
+
+function buildSystemPrompt({ roster = [], events = [], availability = {}, userRole = 'coach', userName = 'Coach' }) {
   const athletes = roster.filter(r => r.group !== 'coaches');
-  const coaches = roster.filter(r => r.group === 'coaches');
+  const coaches  = roster.filter(r => r.group === 'coaches');
 
   const rosterSummary = athletes.length > 0
     ? athletes.map(a => `- ${a.name} | ${a.weight}lbs | ${a.grade} | ${a.group} | Parent: ${a.parent1?.name || 'N/A'}`).join('\n')
@@ -93,23 +165,31 @@ function buildSystemPrompt({ roster = [], events = [], availability = {}, channe
 
   const eventSummary = events.length > 0
     ? events.map(e => `- ${e.title} | ${e.event_type || e.type} | ${e.event_date || e.date} ${e.start_time || e.time} | ${e.location_name || e.location} | Group: ${e.roster_group || e.group || 'all'}`).join('\n')
-    : 'No events loaded yet.';
+    : 'No events scheduled yet.';
 
   const availSummary = Object.keys(availability).length > 0
     ? `${Object.values(availability).filter(v => v === 'confirmed').length} confirmed, ${Object.values(availability).filter(v => v === 'declined').length} declined, rest pending.`
     : 'No availability data yet.';
 
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
   return `You are MatMind, an AI assistant for Lovett Wrestling (The Lovett School, Atlanta, GA). Mascot: Lions 🦁
 
-You are talking to ${userName} (${userRole}).
+You are talking to ${userName} (${userRole}). Today is ${today}.
 
 YOUR ROLE:
-${userRole === 'coach' ? `- You are the coach's private command center. You can manage the roster, schedule, availability, and communications.
-- When a coach asks you to take an action (add practice, mark someone unavailable, send a reminder), confirm what you did with checkmark items.
-- Be proactive — mention upcoming events, availability gaps, and things the coach should know.
-- You can draft emails and messages for the coach to approve before sending.` : `- You are a helpful AI assistant for parents. Answer questions about the schedule, events, and team policies.
+${userRole === 'coach'
+  ? `You are the coach's private command center.
+- To add events to the schedule, use the schedule_events tool — do not just describe it, actually call the tool.
+- When a coach asks to add any practice, match, or event, always call schedule_events with the exact dates.
+- For recurring events, compute each exact YYYY-MM-DD date and include a separate entry per occurrence.
+- For events targeting multiple groups (e.g. "Beginner and Advanced"), include a separate entry per group.
+- After calling the tool, confirm briefly in your text response what you scheduled.
+- Be proactive — mention upcoming events, availability gaps, and things the coach should know.`
+  : `You are a helpful AI assistant for parents.
+- Answer questions about the schedule, events, and team policies.
 - You cannot modify the roster or schedule — direct parents to contact a coach for changes.
-- Be friendly, concise, and helpful. Use the team context below to answer accurately.`}
+- Be friendly, concise, and helpful.`}
 
 COMMUNICATION CHANNELS:
 - MatMind AI: Private coach command center (coaches only)
@@ -119,7 +199,7 @@ COMMUNICATION CHANNELS:
 - #Tots: Youngest wrestlers
 - 🔒Coaches Only: Staff-only channel
 
-IMPORTANT: Beginner and Advanced groups are SKILL-based, not age-based. Athletes of any age can be in either group.
+IMPORTANT: Beginner and Advanced groups are SKILL-based, not age-based.
 
 CURRENT COACHING STAFF:
 ${coachSummary}
@@ -135,53 +215,17 @@ ${availSummary}
 
 RESPONSE FORMAT:
 Respond naturally and conversationally. Keep responses concise — coaches are busy.
-
-When reporting actions you've taken, format them as a list starting with "✅" for each completed action.
-If there's a follow-up question or suggestion, put it on its own line starting with "💡".
-
-DATA ACTIONS — CRITICAL:
-When a coach asks you to add events/practices or update availability, you MUST emit a machine-readable action block as the very last thing in your response, on its own line, with no text after it. Use this exact JSON format:
-
-{"intents":[{"type":"create_event","title":"TITLE","date":"YYYY-MM-DD","time":"H:MM AM/PM","location":"LOCATION","group":"GROUP"}]}
-
-Rules for the intents block:
-- Valid groups: "all", "advanced", "beginner", "tots", "coaches". Use "all" when it applies to everyone.
-- If an event targets MULTIPLE specific groups (e.g. "Beginner and Advanced"), output ONE intent per group for each date.
-- For recurring events (e.g. "every Monday in June"), output one intent per occurrence date.
-- Calculate exact YYYY-MM-DD calendar dates from today's date (shown below). Do not use relative terms like "next Monday" — compute the actual date.
-- "6:30 PM" and "18:30" are both valid time formats.
-- If no data change is needed, omit the intents block entirely — do NOT output empty intents.
-- The intents block must be valid JSON. Output it as a single line with no surrounding markdown.
-
-Example for "add practice every Tuesday in June for Tots":
-{"intents":[{"type":"create_event","title":"Tuesday Practice","date":"2026-06-02","time":"5:00 PM","location":"Lovett Gym","group":"tots"},{"type":"create_event","title":"Tuesday Practice","date":"2026-06-09","time":"5:00 PM","location":"Lovett Gym","group":"tots"},{"type":"create_event","title":"Tuesday Practice","date":"2026-06-16","time":"5:00 PM","location":"Lovett Gym","group":"tots"},{"type":"create_event","title":"Tuesday Practice","date":"2026-06-23","time":"5:00 PM","location":"Lovett Gym","group":"tots"},{"type":"create_event","title":"Tuesday Practice","date":"2026-06-30","time":"5:00 PM","location":"Lovett Gym","group":"tots"}]}
-
-Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
+When reporting completed actions, list them starting with "✅".
+For follow-up suggestions, start the line with "💡".`;
 }
 
+// ── Response parser ──────────────────────────────────────────────────────────
+
 function parseAIResponse(rawText) {
-  // Extract structured intents JSON block (Claude emits it as the last line)
-  let intents = [];
-  let textWithoutIntents = rawText;
-
-  const intentMatch = rawText.match(/\{"intents"\s*:\s*\[[\s\S]*?\]\s*\}/);
-  if (intentMatch) {
-    try {
-      const parsed = JSON.parse(intentMatch[0]);
-      if (Array.isArray(parsed.intents)) {
-        intents = parsed.intents;
-      }
-    } catch (e) {
-      console.warn('MatMind: failed to parse intents JSON:', e.message);
-    }
-    // Remove the JSON block from the visible text
-    textWithoutIntents = rawText.replace(intentMatch[0], '').trim();
-  }
-
-  const lines = textWithoutIntents.split('\n');
-  const actions = [];
+  const lines = rawText.split('\n');
+  const actions   = [];
   const textLines = [];
-  let followUp = null;
+  let followUp    = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -198,6 +242,5 @@ function parseAIResponse(rawText) {
     text: textLines.join('\n').trim(),
     actions,
     followUp,
-    intents,
   };
 }
