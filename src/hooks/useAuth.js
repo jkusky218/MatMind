@@ -52,12 +52,15 @@ export function useAuth() {
   }, []);
 
   async function fetchProfile(userId) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
-    setProfile(data);
+    if (error) {
+      console.error('MatMind: could not load profile — RLS or missing row?', error.message);
+    }
+    setProfile(data ?? null);
     setLoading(false);
   }
 
