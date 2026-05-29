@@ -165,6 +165,7 @@ export default function MainApp({ auth }) {
             roster={roster}
             events={events}
             availability={availability}
+            attendance={attendance}
             setRoster={setRoster}
             setEvents={setEvents}
             setAvailability={setAvailability}

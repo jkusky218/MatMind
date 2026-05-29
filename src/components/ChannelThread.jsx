@@ -10,7 +10,7 @@ import { sendToMatMind } from '../lib/ai';
 
 const VALID_GROUPS = new Set(['all', 'advanced', 'beginner', 'tots', 'coaches']);
 
-async function executeClaudeIntents(intents, { createEvent, updateAvailabilityEntry, roster, events }) {
+async function executeClaudeIntents(intents, { createEvent, updateAvailabilityEntry, sendMessage, roster, events }) {
   if (!intents?.length) return { succeeded: 0, errors: [] };
   const errors = [];
   let succeeded = 0;
@@ -37,8 +37,14 @@ async function executeClaudeIntents(intents, { createEvent, updateAvailabilityEn
       } else {
         succeeded++;
       }
+    } else if (intent.type === 'post_message' && sendMessage && intent.message) {
+      const channel = VALID_GROUPS.has(intent.channel) || intent.channel === 'announcements'
+        ? intent.channel
+        : 'announcements';
+      console.log('[MatMind] Claude intent → post_message to', channel);
+      await sendMessage(channel, intent.message);
+      succeeded++;
     }
-    // Future: mark_unavailable, send_message, etc.
   }
 
   return { succeeded, errors };
@@ -242,7 +248,7 @@ export default function ChannelThread({
   messages,
   onBack,
   onSendMessage,
-  roster, events, availability,
+  roster, events, availability, attendance,
   setRoster, setEvents, setAvailability,
   createEvent,
   updateAvailabilityEntry,
@@ -284,7 +290,7 @@ export default function ChannelThread({
       // ── 1. Get Claude's response (it includes structured intents when needed) ──
       const resp = await sendToMatMind(
         text,
-        { roster, events, availability, userRole: userRole ?? 'coach', userName: senderName ?? 'Coach' },
+        { roster, events, availability, attendance: attendance ?? {}, userRole: userRole ?? 'coach', userName: senderName ?? 'Coach' },
         history,
       );
 
@@ -307,7 +313,7 @@ export default function ChannelThread({
         // ── 2. Execute Claude's structured intents ────────────────────────
         const { succeeded, errors } = await executeClaudeIntents(
           resp.intents,
-          { createEvent, updateAvailabilityEntry, roster, events },
+          { createEvent, updateAvailabilityEntry, sendMessage: onSendMessage, roster, events },
         );
 
         // If any intents failed, append a warning to the response
@@ -384,7 +390,7 @@ export default function ChannelThread({
             {[
               "Who's confirmed for the next tournament?",
               "Add practice Thursday at 6pm",
-              "Send a reminder to all families",
+              "Post our top attendance leaders to #Announcements",
             ].map((q, i) => (
               <button key={i}
                 onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50); }}

@@ -9,13 +9,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { message, history = [], roster, events, availability, channels, userRole, userName } = req.body;
+  const { message, history = [], roster, events, availability, attendance, channels, userRole, userName } = req.body;
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
-  const systemPrompt = buildSystemPrompt({ roster, events, availability, channels, userRole, userName });
+  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, channels, userRole, userName });
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
-        tools: [buildScheduleTool()],
+        tools: [buildScheduleTool(), buildPostMessageTool()],
         tool_choice: { type: 'auto' },
         system: [
           {
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
         aiText += block.text;
       } else if (block.type === 'tool_use' && block.name === 'schedule_events') {
         // Tool call is structured and validated — far more reliable than in-text JSON
-        intents = (block.input?.events || []).map(e => ({
+        const newIntents = (block.input?.events || []).map(e => ({
           type: 'create_event',
           title: e.title,
           date: e.date,
@@ -74,16 +74,33 @@ export default async function handler(req, res) {
           group: e.group || 'all',
           eventType: e.eventType || 'practice',
         }));
+        intents.push(...newIntents);
+      } else if (block.type === 'tool_use' && block.name === 'post_to_channel') {
+        intents.push({
+          type: 'post_message',
+          channel: block.input?.channel || 'announcements',
+          message: block.input?.message || '',
+        });
       }
     }
 
-    // If Claude only returned a tool call with no text, synthesise a short reply
+    // If Claude only returned tool calls with no text, synthesise a short reply
     if (!aiText.trim() && intents.length > 0) {
-      const groups = [...new Set(intents.map(i => i.group))];
-      const dates  = [...new Set(intents.map(i => i.date))];
-      aiText = `Done! I've added **${dates.length} practice session${dates.length !== 1 ? 's' : ''}** to the schedule`;
-      if (groups.length === 1 && groups[0] !== 'all') aiText += ` for the ${groups[0]} group`;
-      aiText += '.';
+      const eventIntents = intents.filter(i => i.type === 'create_event');
+      const postIntents  = intents.filter(i => i.type === 'post_message');
+
+      if (eventIntents.length > 0) {
+        const groups = [...new Set(eventIntents.map(i => i.group))];
+        const dates  = [...new Set(eventIntents.map(i => i.date))];
+        aiText = `Done! I've added **${dates.length} practice session${dates.length !== 1 ? 's' : ''}** to the schedule`;
+        if (groups.length === 1 && groups[0] !== 'all') aiText += ` for the ${groups[0]} group`;
+        aiText += '.';
+      }
+      if (postIntents.length > 0) {
+        const channels = postIntents.map(i => `#${i.channel}`).join(', ');
+        if (aiText) aiText += ` Posted to ${channels}.`;
+        else aiText = `Done! I've posted the message to ${channels}.`;
+      }
     }
 
     const { text, actions, followUp } = parseAIResponse(aiText);
@@ -106,7 +123,33 @@ export default async function handler(req, res) {
   }
 }
 
-// ── Tool definition ──────────────────────────────────────────────────────────
+// ── Tool definitions ─────────────────────────────────────────────────────────
+
+function buildPostMessageTool() {
+  return {
+    name: 'post_to_channel',
+    description:
+      'Post a message to a team channel. ' +
+      'Use this when the coach asks you to post, announce, share, or publish something to a channel. ' +
+      'Write the full message content — use emoji to boost team morale. ' +
+      'For attendance leaderboards: compute rankings from the attendance data in your context, then call this tool.',
+    input_schema: {
+      type: 'object',
+      required: ['channel', 'message'],
+      properties: {
+        channel: {
+          type: 'string',
+          enum: ['announcements', 'advanced', 'beginner', 'tots', 'coaches'],
+          description: 'Which channel to post to. Use "announcements" for team-wide messages.',
+        },
+        message: {
+          type: 'string',
+          description: 'The message text to post. Markdown supported. Include emoji for engagement.',
+        },
+      },
+    },
+  };
+}
 
 function buildScheduleTool() {
   return {
@@ -149,9 +192,43 @@ function buildScheduleTool() {
   };
 }
 
+// ── Attendance summary helper ─────────────────────────────────────────────────
+// Converts the flat { 'athleteId-eventId': 'present'|'absent' } map into a
+// per-athlete leaderboard string Claude can reason over directly.
+
+function buildAttendanceSummary(attendance = {}, roster = []) {
+  const entries = Object.entries(attendance);
+  if (!entries.length) return 'No attendance recorded yet.';
+
+  const athletes = roster.filter(r => r.group !== 'coaches');
+  const stats = {};
+
+  for (const athlete of athletes) {
+    const id = String(athlete.id);
+    let present = 0, absent = 0;
+    for (const [key, status] of entries) {
+      // key format: "${athleteId}-${eventId}" — check prefix to avoid substring collisions
+      if (key.startsWith(id + '-')) {
+        if (status === 'present') present++;
+        else if (status === 'absent') absent++;
+      }
+    }
+    if (present > 0 || absent > 0) {
+      stats[id] = { name: athlete.name, group: athlete.group, present, absent };
+    }
+  }
+
+  const sorted = Object.values(stats).sort((a, b) => b.present - a.present || a.absent - b.absent);
+  if (!sorted.length) return 'No attendance recorded yet.';
+
+  return sorted
+    .map(s => `- ${s.name} | ${s.group} | ${s.present} present, ${s.absent} absent`)
+    .join('\n');
+}
+
 // ── System prompt ────────────────────────────────────────────────────────────
 
-function buildSystemPrompt({ roster = [], events = [], availability = {}, userRole = 'coach', userName = 'Coach' }) {
+function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, userRole = 'coach', userName = 'Coach' }) {
   const athletes = roster.filter(r => r.group !== 'coaches');
   const coaches  = roster.filter(r => r.group === 'coaches');
 
@@ -171,6 +248,8 @@ function buildSystemPrompt({ roster = [], events = [], availability = {}, userRo
     ? `${Object.values(availability).filter(v => v === 'confirmed').length} confirmed, ${Object.values(availability).filter(v => v === 'declined').length} declined, rest pending.`
     : 'No availability data yet.';
 
+  const attendSummary = buildAttendanceSummary(attendance, roster);
+
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return `You are MatMind, an AI assistant for Lovett Wrestling (The Lovett School, Atlanta, GA). Mascot: Lions 🦁
@@ -185,6 +264,8 @@ ${userRole === 'coach'
 - For recurring events, compute each exact YYYY-MM-DD date and include a separate entry per occurrence.
 - For events targeting multiple groups (e.g. "Beginner and Advanced"), include a separate entry per group.
 - After calling the tool, confirm briefly in your text response what you scheduled.
+- To post a message to a channel, use the post_to_channel tool. When the coach asks to post, announce, or share something, call it immediately.
+- For attendance leaderboards: read the ATTENDANCE RECORDS below, rank athletes by present count, compose an engaging message, then call post_to_channel.
 - Be proactive — mention upcoming events, availability gaps, and things the coach should know.`
   : `You are a helpful AI assistant for parents.
 - Answer questions about the schedule, events, and team policies.
@@ -212,6 +293,9 @@ ${eventSummary}
 
 AVAILABILITY SUMMARY:
 ${availSummary}
+
+ATTENDANCE RECORDS (present/absent per athlete — use for leaderboards and gamification):
+${attendSummary}
 
 RESPONSE FORMAT:
 Respond naturally and conversationally. Keep responses concise — coaches are busy.

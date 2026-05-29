@@ -20,6 +20,7 @@ export async function sendToMatMind(message, context = {}, history = []) {
         roster: context.roster || [],
         events: context.events || [],
         availability: context.availability || {},
+        attendance: context.attendance || {},
         channels: context.channels || [],
         userRole: context.userRole || 'coach',
         userName: context.userName || 'Coach',
