@@ -94,5 +94,26 @@ export const Pin = (s = 12, c = "currentColor") => svg(<>
   <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
 </>, s, c);
 
+export const BookOpen = (s = 18, c = "currentColor") => svg(<>
+  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+</>, s, c);
+
+export const Upload = (s = 18, c = "currentColor") => svg(<>
+  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+  <polyline points="17 8 12 3 7 8"/>
+  <line x1="12" y1="3" x2="12" y2="15"/>
+</>, s, c);
+
+export const Trash = (s = 14, c = "currentColor") => svg(<>
+  <polyline points="3 6 5 6 21 6"/>
+  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+</>, s, c);
+
+export const Pencil = (s = 14, c = "currentColor") => svg(<>
+  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+</>, s, c);
+
 // Map icon name strings to component functions (matches CHANNELS[].icon)
 export const ICON_MAP = { brain: Brain, megaphone: Megaphone, hash: Hash, lock: Lock };

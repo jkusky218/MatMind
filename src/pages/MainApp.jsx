@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { BRAND } from '../lib/constants';
-import { Brain, Chat, Calendar, Users, UserIcon } from '../components/Icons';
+import { Brain, Chat, Calendar, Users, UserIcon, BookOpen } from '../components/Icons';
 import { useTeamData } from '../hooks/useTeamData';
-import ChannelList   from '../components/ChannelList';
-import ChannelThread from '../components/ChannelThread';
-import ScheduleTab   from '../components/ScheduleTab';
-import RosterTab     from '../components/RosterTab';
-import AdminPanel    from '../components/AdminPanel';
+import ChannelList       from '../components/ChannelList';
+import ChannelThread     from '../components/ChannelThread';
+import ScheduleTab       from '../components/ScheduleTab';
+import RosterTab         from '../components/RosterTab';
+import AdminPanel        from '../components/AdminPanel';
+import KnowledgeBaseTab  from '../components/KnowledgeBaseTab';
 
 const TABS = [
-  { id: 'messages', label: 'Messages', Icon: Chat },
-  { id: 'schedule', label: 'Schedule', Icon: Calendar },
-  { id: 'roster',   label: 'Roster',   Icon: Users },
+  { id: 'messages',  label: 'Messages', Icon: Chat },
+  { id: 'schedule',  label: 'Schedule', Icon: Calendar },
+  { id: 'roster',    label: 'Roster',   Icon: Users },
+  { id: 'kb',        label: 'KB',       Icon: BookOpen },
 ];
 
 export default function MainApp({ auth }) {
@@ -194,6 +196,9 @@ export default function MainApp({ auth }) {
             )}
             {tab === 'roster' && (
               <RosterTab roster={roster} />
+            )}
+            {tab === 'kb' && (
+              <KnowledgeBaseTab isCoach={isCoach} />
             )}
           </>
         )}
