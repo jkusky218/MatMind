@@ -220,14 +220,42 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE broadcasts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations ENABLE ROW LEVEL SECURITY;
 
--- Profiles: users can read teammates, update own
+-- Helper: returns the team_id of the current user without recursion
+-- SECURITY DEFINER bypasses RLS on the inner profiles read.
+CREATE OR REPLACE FUNCTION public.get_auth_team_id()
+RETURNS UUID LANGUAGE SQL SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT team_id FROM public.profiles WHERE id = auth.uid();
+$$;
+
+-- Profiles: own profile always readable; teammates readable via security-definer fn
+CREATE POLICY "Users can read own profile"
+  ON profiles FOR SELECT
+  USING (id = auth.uid());
+
 CREATE POLICY "Users can view team profiles"
   ON profiles FOR SELECT
-  USING (team_id IN (SELECT team_id FROM profiles WHERE id = auth.uid()));
+  USING (team_id = get_auth_team_id());
 
 CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE
   USING (id = auth.uid());
+
+-- Teams: team members can view their own team
+CREATE POLICY "Team members can view own team"
+  ON teams FOR SELECT
+  USING (id = get_auth_team_id());
+
+-- Coaches: team members can view
+CREATE POLICY "Team members can view coaches"
+  ON coaches FOR SELECT
+  USING (team_id = get_auth_team_id());
+
+-- Athlete-parents: team members can view (needed for parent contact info)
+CREATE POLICY "Team members can view athlete parents"
+  ON athlete_parents FOR SELECT
+  USING (athlete_id IN (
+    SELECT id FROM athletes WHERE team_id = get_auth_team_id()
+  ));
 
 -- Athletes: team members can read, coaches can write
 CREATE POLICY "Team members can view athletes"
