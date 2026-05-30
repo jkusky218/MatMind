@@ -15,7 +15,6 @@ export const CHANNELS = [
   { id: "advanced",      label: "Advanced",        desc: "Skill-based group",              icon: "hash",     color: BRAND.navy,    private: false },
   { id: "beginner",      label: "Beginner",        desc: "Skill-based group",              icon: "hash",     color: BRAND.columbia, private: false },
   { id: "tots",          label: "Tots",            desc: "Youngest wrestlers",             icon: "hash",     color: "#7B5EA7",     private: false },
-  { id: "coaches",       label: "Coaches Only",    desc: "Staff-only channel",             icon: "lock",     color: BRAND.gold,    private: true },
 ];
 
 // Maps Supabase channel `name` values to our slug IDs
@@ -24,5 +23,4 @@ export const CHANNEL_NAME_TO_SLUG = {
   Advanced:      "advanced",
   Beginner:      "beginner",
   Tots:          "tots",
-  "Coaches Only": "coaches",
 };
