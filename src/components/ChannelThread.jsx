@@ -260,7 +260,7 @@ export default function ChannelThread({
 
   const greeting = {
     id: 0, sender: 'MatMind AI', role: 'ai',
-    text: `Hey Coach! 🦁 You have **${events.length} events** upcoming and **${confirmed} confirmations** logged.\n\nThis is your private command center. What do you need?`,
+    text: `Hey Coach! 🦁 You have **${events.length} events** upcoming and **${confirmed} confirmations** logged.\n\nAsk me anything about the team — schedule, roster, availability, or send a message for you.`,
     time: 'Now',
   };
 

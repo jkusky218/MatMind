@@ -10,7 +10,7 @@ export const GROUP_COLORS = { coaches: BRAND.gold, tots: "#7B5EA7", beginner: BR
 
 // Static channel config — order and metadata are fixed; IDs map to DB slugs
 export const CHANNELS = [
-  { id: "ai",            label: "MatMind AI",     desc: "Your private AI command center", icon: "brain",    color: BRAND.columbia, private: true },
+  { id: "ai",            label: "MatMind AI",     desc: "Ask me anything about the team", icon: "brain",    color: BRAND.columbia, private: true },
   { id: "announcements", label: "Announcements",  desc: "Team-wide updates",              icon: "megaphone", color: BRAND.navy,    private: false },
   { id: "advanced",      label: "Advanced",        desc: "Skill-based group",              icon: "hash",     color: BRAND.navy,    private: false },
   { id: "beginner",      label: "Beginner",        desc: "Skill-based group",              icon: "hash",     color: BRAND.columbia, private: false },

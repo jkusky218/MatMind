@@ -37,7 +37,7 @@ export default function ChannelList({ onSelect, channelMessages }) {
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', margin: 0 }}>MatMind AI</p>
-            <p style={{ fontSize: 12, color: BRAND.columbiaMid, margin: '2px 0 0' }}>Your private command center</p>
+            <p style={{ fontSize: 12, color: BRAND.columbiaMid, margin: '2px 0 0' }}>Ask me anything about the team</p>
           </div>
           <div style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(107,173,228,0.15)', fontSize: 10, fontWeight: 600, color: BRAND.columbia }}>
             Private
