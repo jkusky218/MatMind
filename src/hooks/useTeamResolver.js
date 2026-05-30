@@ -1,13 +1,13 @@
 // useTeamResolver — reads the subdomain before auth and fetches public
 // team branding so the login screen shows the right name + colors.
 //
-// lovett.matmind.app  → slug='lovett' → fetches /api/team?slug=lovett
+// lovett.mat-mind.com → slug='lovett' → fetches /api/team?slug=lovett
 // localhost           → slug=null     → returns null (demo/default branding)
-// mat-mind-bay.vercel.app → slug=null → same (Vercel preview URL)
+// mat-mind-bay.vercel.app → slug=null → same (Vercel preview URL, no team)
 
 import { useState, useEffect } from 'react';
 
-// Set VITE_ROOT_DOMAIN=matmind.app in Vercel env vars.
+// Set VITE_ROOT_DOMAIN=mat-mind.com in Vercel env vars.
 // Unset locally → subdomain detection is disabled → demo mode.
 const ROOT_DOMAIN = import.meta.env.VITE_ROOT_DOMAIN || '';
 

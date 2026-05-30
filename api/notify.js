@@ -6,7 +6,7 @@ import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 
 webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || 'https://mat-mind-bay.vercel.app',
+  process.env.VAPID_SUBJECT || 'https://mat-mind.com',
   process.env.VITE_VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY,
 );
