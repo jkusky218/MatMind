@@ -8,6 +8,22 @@ const TYPE_STYLE = {
   match:      { bg: BRAND.columbiaLight, color: BRAND.navy,  label: 'Match' },
 };
 
+// practice / meeting / other → 'practice' bucket; match / tournament → 'competition'
+const COMPETITION_TYPES = new Set(['match', 'tournament']);
+
+const TYPE_FILTERS = [
+  { id: 'all',         label: 'All',         emoji: '' },
+  { id: 'practice',    label: 'Practice',    emoji: '💪' },
+  { id: 'competition', label: 'Competition', emoji: '🏆' },
+];
+
+const GROUP_FILTERS = [
+  { id: 'all',      label: 'All Groups' },
+  { id: 'advanced', label: 'Advanced'   },
+  { id: 'beginner', label: 'Beginner'   },
+  { id: 'tots',     label: 'Tots'       },
+];
+
 function formatDate(ds) {
   const d = new Date(ds + 'T12:00:00');
   return {
@@ -281,20 +297,72 @@ function EventCard({ ev, availability, attendance, recordAttendance, athletes, i
 
 export default function ScheduleTab({ events, availability, attendance = {}, recordAttendance, roster, isCoach = false }) {
   const athletes = roster.filter(r => r.group !== 'coaches');
+  const [typeFilter,  setTypeFilter]  = useState('all');
+  const [groupFilter, setGroupFilter] = useState('all');
+
+  const filtered = events.filter(ev => {
+    const typeMatch = typeFilter === 'all'
+      ? true
+      : typeFilter === 'competition'
+        ? COMPETITION_TYPES.has(ev.type)
+        : !COMPETITION_TYPES.has(ev.type);
+
+    // Group: show event if it targets the selected group OR is open to all groups
+    const groupMatch = groupFilter === 'all'
+      ? true
+      : ev.group === groupFilter || ev.group === 'all';
+
+    return typeMatch && groupMatch;
+  });
+
+  const chipStyle = (active, color) => ({
+    padding: '5px 13px', borderRadius: 20, border: 'none',
+    background: active ? (color ?? BRAND.navy) : '#f0f4f8',
+    color: active ? '#fff' : '#666',
+    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    whiteSpace: 'nowrap', transition: 'background 0.15s, color 0.15s',
+  });
 
   return (
     <div style={{ padding: '16px 12px', overflowY: 'auto', height: '100%' }}>
-      <div style={{ marginBottom: 16 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 12 }}>
         <p style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Schedule</p>
-        <p style={{ fontSize: 12, color: '#888', margin: '2px 0 0' }}>{events.length} upcoming</p>
+        <p style={{ fontSize: 12, color: '#888', margin: '2px 0 0' }}>
+          {filtered.length === events.length
+            ? `${events.length} upcoming`
+            : `${filtered.length} of ${events.length} upcoming`}
+        </p>
       </div>
 
-      {events.length === 0 && (
-        <p style={{ textAlign: 'center', color: '#bbb', fontSize: 13, marginTop: 40 }}>No upcoming events</p>
+      {/* Type filter chips */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8, overflowX: 'auto', paddingBottom: 2 }}>
+        {TYPE_FILTERS.map(({ id, label, emoji }) => (
+          <button key={id} onClick={() => setTypeFilter(id)}
+            style={chipStyle(typeFilter === id, BRAND.navy)}>
+            {emoji ? `${emoji} ${label}` : label}
+          </button>
+        ))}
+      </div>
+
+      {/* Group filter chips */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto', paddingBottom: 2 }}>
+        {GROUP_FILTERS.map(({ id, label }) => (
+          <button key={id} onClick={() => setGroupFilter(id)}
+            style={chipStyle(groupFilter === id, id === 'all' ? BRAND.navy : GROUP_COLORS[id])}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <p style={{ textAlign: 'center', color: '#bbb', fontSize: 13, marginTop: 40 }}>
+          {events.length === 0 ? 'No upcoming events' : 'No events match this filter'}
+        </p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {events.map(ev => (
+        {filtered.map(ev => (
           <EventCard
             key={ev.id}
             ev={ev}
