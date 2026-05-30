@@ -346,7 +346,7 @@ export default function ChannelThread({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid #e8edf2', background: '#fff', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))', paddingBottom: '10px', paddingLeft: '12px', paddingRight: '12px', borderBottom: '1px solid #e8edf2', background: '#fff', flexShrink: 0 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
           {ChevLeft(20, BRAND.navy)}
         </button>
@@ -403,7 +403,7 @@ export default function ChannelThread({
       </div>
 
       {/* Input */}
-      <div style={{ padding: '8px 12px', borderTop: '1px solid #e8edf2', display: 'flex', gap: 8, alignItems: 'center', background: '#fff' }}>
+      <div style={{ paddingTop: '8px', paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))', paddingLeft: '12px', paddingRight: '12px', borderTop: '1px solid #e8edf2', display: 'flex', gap: 8, alignItems: 'center', background: '#fff' }}>
         <input
           ref={inputRef}
           value={input}

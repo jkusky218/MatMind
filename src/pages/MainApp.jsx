@@ -213,7 +213,8 @@ export default function MainApp({ auth }) {
       {!activeChannel && (
         <div style={{
           background: `linear-gradient(135deg, ${BRAND.navyDark} 0%, ${BRAND.navy} 100%)`,
-          padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+          paddingTop: 'calc(14px + env(safe-area-inset-top, 0px))', paddingBottom: '14px', paddingLeft: '16px', paddingRight: '16px',
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
         }}>
           <div style={{
             width: 34, height: 34, borderRadius: '50%',
@@ -293,7 +294,7 @@ export default function MainApp({ auth }) {
       />
 
       {/* ── Content ── */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {activeChannel ? (
           <ChannelThread
             channel={activeChannel}
