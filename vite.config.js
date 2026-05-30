@@ -6,8 +6,15 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // injectManifest lets us write a custom service worker (src/sw.js) with
+      // push event handlers. Workbox injects self.__WB_MANIFEST into it at build time.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+
       manifest: {
         name: 'MatMind — Lovett Wrestling',
         short_name: 'MatMind',
@@ -24,15 +31,9 @@ export default defineConfig({
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
+
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: { cacheName: 'google-fonts-cache', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
-          },
-        ],
       },
     }),
   ],
