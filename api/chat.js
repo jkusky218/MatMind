@@ -90,10 +90,10 @@ export default async function handler(req, res) {
       const postIntents  = intents.filter(i => i.type === 'post_message');
 
       if (eventIntents.length > 0) {
-        const groups = [...new Set(eventIntents.map(i => i.group))];
-        const dates  = [...new Set(eventIntents.map(i => i.date))];
-        aiText = `Done! I've added **${dates.length} practice session${dates.length !== 1 ? 's' : ''}** to the schedule`;
-        if (groups.length === 1 && groups[0] !== 'all') aiText += ` for the ${groups[0]} group`;
+        const groups = [...new Set(eventIntents.map(i => i.group).filter(g => g && g !== 'all'))];
+        aiText = `Done! I've added **${eventIntents.length} practice session${eventIntents.length !== 1 ? 's' : ''}** to the schedule`;
+        if (groups.length > 1)      aiText += ` (${groups.join(' + ')})`;
+        else if (groups.length === 1) aiText += ` for the ${groups[0]} group`;
         aiText += '.';
       }
       if (postIntents.length > 0) {
