@@ -9,13 +9,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { message, history = [], roster, events, availability, attendance, channels, userRole, userName } = req.body;
+  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName } = req.body;
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
-  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, channels, userRole, userName });
+  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, knowledgeBase, channels, userRole, userName });
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -228,7 +228,7 @@ function buildAttendanceSummary(attendance = {}, roster = []) {
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
-function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, userRole = 'coach', userName = 'Coach' }) {
+function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, knowledgeBase = [], userRole = 'coach', userName = 'Coach' }) {
   const athletes = roster.filter(r => r.group !== 'coaches');
   const coaches  = roster.filter(r => r.group === 'coaches');
 
@@ -249,6 +249,12 @@ function buildSystemPrompt({ roster = [], events = [], availability = {}, attend
     : 'No availability data yet.';
 
   const attendSummary = buildAttendanceSummary(attendance, roster);
+
+  const kbSummary = knowledgeBase.length > 0
+    ? knowledgeBase
+        .map(e => `### ${e.title} [${e.category}]\n${e.content}`)
+        .join('\n\n---\n\n')
+    : 'No knowledge base entries yet.';
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -296,6 +302,9 @@ ${availSummary}
 
 ATTENDANCE RECORDS (present/absent per athlete — use for leaderboards and gamification):
 ${attendSummary}
+
+KNOWLEDGE BASE (${knowledgeBase.length} entries — use this to answer parent questions and generate messages):
+${kbSummary}
 
 RESPONSE FORMAT:
 Respond naturally and conversationally. Keep responses concise — coaches are busy.

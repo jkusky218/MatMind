@@ -8,6 +8,7 @@ import ScheduleTab       from '../components/ScheduleTab';
 import RosterTab         from '../components/RosterTab';
 import AdminPanel        from '../components/AdminPanel';
 import KnowledgeBaseTab  from '../components/KnowledgeBaseTab';
+import { useKnowledgeBase } from '../hooks/useKnowledgeBase';
 
 const TABS = [
   { id: 'messages',  label: 'Messages', Icon: Chat },
@@ -30,6 +31,13 @@ export default function MainApp({ auth }) {
     createEvent, updateAvailabilityEntry,
     loading, isDemo,
   } = useTeamData(auth);
+
+  const {
+    entries: kbEntries,
+    loading: kbLoading,
+    addEntry: addKbEntry,
+    deleteEntry: deleteKbEntry,
+  } = useKnowledgeBase(auth);
 
   const isCoach = auth.profile?.role === 'coach' || auth.profile?.role === 'admin' || !auth.profile;
 
@@ -168,6 +176,7 @@ export default function MainApp({ auth }) {
             events={events}
             availability={availability}
             attendance={attendance}
+            kbEntries={kbEntries}
             setRoster={setRoster}
             setEvents={setEvents}
             setAvailability={setAvailability}
@@ -198,7 +207,13 @@ export default function MainApp({ auth }) {
               <RosterTab roster={roster} />
             )}
             {tab === 'kb' && (
-              <KnowledgeBaseTab isCoach={isCoach} />
+              <KnowledgeBaseTab
+                entries={kbEntries}
+                loading={kbLoading}
+                onAdd={addKbEntry}
+                onDelete={deleteKbEntry}
+                isCoach={isCoach}
+              />
             )}
           </>
         )}

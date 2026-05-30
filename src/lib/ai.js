@@ -17,13 +17,14 @@ export async function sendToMatMind(message, context = {}, history = []) {
       body: JSON.stringify({
         message,
         history,
-        roster: context.roster || [],
-        events: context.events || [],
-        availability: context.availability || {},
-        attendance: context.attendance || {},
-        channels: context.channels || [],
-        userRole: context.userRole || 'coach',
-        userName: context.userName || 'Coach',
+        roster:        context.roster       || [],
+        events:        context.events       || [],
+        availability:  context.availability || {},
+        attendance:    context.attendance   || {},
+        knowledgeBase: context.kbEntries    || [],
+        channels:      context.channels     || [],
+        userRole:      context.userRole     || 'coach',
+        userName:      context.userName     || 'Coach',
       }),
     });
 

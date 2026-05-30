@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MatMind — Attendance Mockup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #e8edf2;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .app {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #f8fafb;
+      position: relative;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #0F2440 0%, #1B3A5C 100%);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .header-icon {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(107,173,228,0.15);
+      border: 1px solid rgba(107,173,228,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .header-title { font-weight: 700; font-size: 16px; color: #fff; letter-spacing: -0.3px; }
+    .header-sub   { font-size: 11px; color: #6BADE4; }
+
+    /* ── Tab bar ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e8edf2;
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .tab {
+      flex: 1; padding: 10px 0; border: none; background: none; cursor: pointer;
+      font-size: 12px; font-weight: 600; font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+    }
+    .tab.active { color: #1B3A5C; border-bottom: 2px solid #1B3A5C; }
+    .tab.inactive { color: #aab4c0; border-bottom: 2px solid transparent; }
+
+    /* ── Scroll area ── */
+    .scroll { flex: 1; overflow-y: auto; padding: 16px 12px; }
+    .schedule-heading { font-size: 18px; font-weight: 700; color: #1a1a1a; margin-bottom: 2px; }
+    .schedule-sub     { font-size: 12px; color: #8a96a3; margin-bottom: 14px; }
+
+    /* ── Event card ── */
+    .event-card {
+      background: #fff;
+      border-radius: 14px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border: 1px solid #eef1f5;
+    }
+    .event-card.collapsed .card-body { display: none; }
+
+    .card-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .date-badge {
+      text-align: center; flex-shrink: 0; width: 38px;
+    }
+    .date-day   { font-size: 10px; font-weight: 600; color: #8a96a3; text-transform: uppercase; }
+    .date-num   { font-size: 22px; font-weight: 700; color: #1B3A5C; line-height: 1; }
+    .date-month { font-size: 10px; font-weight: 600; color: #8a96a3; text-transform: uppercase; }
+    .card-info  { flex: 1; }
+    .card-title { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+    .card-meta  { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .card-meta span { font-size: 11px; color: #8a96a3; display: flex; align-items: center; gap: 3px; }
+    .badge {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .badge-practice  { background: #E8F2FC; color: #1B3A5C; }
+    .badge-advanced  { background: #1B3A5C; color: #fff; }
+    .badge-tournament{ background: #FAF3E0; color: #C4A44A; }
+    .badge-match     { background: #f0f4ff; color: #4B5EBB; }
+    .chevron { font-size: 14px; color: #bcc5d0; transition: transform 0.2s; flex-shrink: 0; }
+    .card-header.open .chevron { transform: rotate(180deg); }
+
+    .card-body { padding: 0 14px 14px; }
+    .divider   { height: 1px; background: #f0f2f5; margin: 10px 0; }
+
+    /* ── Availability section (collapsed/summary) ── */
+    .avail-row { display: flex; gap: 16px; margin-bottom: 8px; }
+    .avail-stat { text-align: center; }
+    .avail-num  { font-size: 16px; font-weight: 700; color: #1B3A5C; }
+    .avail-lbl  { font-size: 10px; color: #8a96a3; text-transform: uppercase; letter-spacing: 0.3px; }
+    .avail-bar  { height: 4px; background: #f0f2f5; border-radius: 2px; overflow: hidden; margin-bottom: 10px; }
+    .avail-fill { height: 100%; background: #22C55E; border-radius: 2px; }
+
+    /* ── Attendance section ── */
+    .attendance-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .attendance-title {
+      font-size: 13px; font-weight: 700; color: #1a1a1a;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .att-badge {
+      font-size: 11px; font-weight: 600; padding: 2px 8px;
+      background: #f0f4f8; color: #4a5568; border-radius: 20px;
+    }
+    .att-badge.complete { background: #ecfdf5; color: #059669; }
+    .start-btn {
+      font-size: 12px; font-weight: 600; padding: 6px 12px;
+      background: #1B3A5C; color: #fff; border: none; border-radius: 8px;
+      cursor: pointer; font-family: inherit;
+    }
+
+    /* ── Athlete attendance rows ── */
+    .att-list { display: flex; flex-direction: column; gap: 6px; }
+    .att-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 10px;
+      background: #f8fafb; border: 1px solid #eef1f5;
+      transition: background 0.15s;
+    }
+    .att-row.present { background: #ecfdf5; border-color: #a7f3d0; }
+    .att-row.absent  { background: #fff5f5; border-color: #fca5a5; }
+
+    .att-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #fff;
+      background: #1B3A5C; flex-shrink: 0;
+    }
+    .att-row.present .att-avatar { background: #059669; }
+    .att-row.absent  .att-avatar { background: #dc2626; }
+
+    .att-name   { flex: 1; font-size: 13px; font-weight: 600; color: #1a1a1a; }
+    .att-weight { font-size: 11px; color: #8a96a3; }
+
+    .att-btns { display: flex; gap: 4px; }
+    .att-btn {
+      width: 34px; height: 28px; border-radius: 7px; border: 1.5px solid #dde3ea;
+      font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+      background: #fff; color: #8a96a3; transition: all 0.15s;
+    }
+    .att-btn.p-active { background: #059669; border-color: #059669; color: #fff; }
+    .att-btn.a-active { background: #dc2626; border-color: #dc2626; color: #fff; }
+
+    /* ── Progress bar ── */
+    .att-progress-wrap { margin-bottom: 10px; }
+    .att-progress-bar  { height: 5px; background: #f0f2f5; border-radius: 3px; overflow: hidden; }
+    .att-progress-fill { height: 100%; background: #1B3A5C; border-radius: 3px; transition: width 0.3s; }
+
+    /* ── Done button ── */
+    .done-btn {
+      width: 100%; padding: 12px; border-radius: 12px; border: none;
+      background: linear-gradient(135deg, #0F2440, #1B3A5C);
+      color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+      margin-top: 12px; font-family: inherit;
+    }
+    .done-btn:disabled { background: #ccd5de; cursor: default; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">🤼</div>
+    <div>
+      <div class="header-title">MatMind</div>
+      <div class="header-sub">Lovett Wrestling · Demo</div>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tabs">
+    <button class="tab inactive">💬 Messages</button>
+    <button class="tab active">📅 Schedule</button>
+    <button class="tab inactive">👥 Roster</button>
+  </div>
+
+  <!-- Schedule content -->
+  <div class="scroll">
+    <div class="schedule-heading">Schedule</div>
+    <div class="schedule-sub">4 upcoming</div>
+
+    <!-- ── CARD 1: collapsed past practice ── -->
+    <div class="event-card collapsed" onclick="toggleCard(this)">
+      <div class="card-header">
+        <div class="date-badge">
+          <div class="date-day">TUE</div>
+          <div class="date-num">26</div>
+          <div class="date-month">May</div>
+        </div>
+        <div class="card-info">
+          <div class="card-title">Tuesday Practice</div>
+          <div class="card-meta">
+            <span>🕐 6:00 PM</span>
+            <span>📍 Lovett Gym</span>
+            <span><span class="badge badge-practice">Practice</span></span>
+          </div>
+        </div>
+        <div class="chevron">▾</div>
+      </div>
+    </div>
+
+    <!-- ── CARD 2: TODAY's Advanced Practice (EXPANDED with attendance open) ── -->
+    <div class="event-card" id="advancedCard">
+      <div class="card-header open" onclick="toggleCard(document.getElementById('advancedCard'))">
+        <div class="date-badge">
+          <div class="date-day">THU</div>
+          <div class="date-num">28</div>
+          <div class="date-month">May</div>
+        </div>
+        <div class="card-info">
+          <div class="card-title">Thursday Practice</div>
+          <div class="card-meta">
+            <span>🕕 6:30 PM</span>
+            <span>📍 Murray Athletic Center</span>
+          </div>
+          <div class="card-meta" style="margin-top:4px">
+            <span><span class="badge badge-practice">Practice</span></span>
+            <span><span class="badge badge-advanced">Advanced</span></span>
+          </div>
+        </div>
+        <div class="chevron" style="transform:rotate(180deg)">▾</div>
+      </div>
+
+      <div class="card-body">
+
+        <!-- Availability summary -->
+        <div style="font-size:11px;font-weight:700;color:#8a96a3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Availability</div>
+        <div class="avail-row">
+          <div class="avail-stat"><div class="avail-num" style="color:#22C55E">7</div><div class="avail-lbl">Confirmed</div></div>
+          <div class="avail-stat"><div class="avail-num" style="color:#ef4444">1</div><div class="avail-lbl">Declined</div></div>
+          <div class="avail-stat"><div class="avail-num" style="color:#f59e0b">1</div><div class="avail-lbl">Pending</div></div>
+        </div>
+        <div class="avail-bar"><div class="avail-fill" style="width:77%"></div></div>
+
+        <div class="divider"></div>
+
+        <!-- Attendance section -->
+        <div class="attendance-header">
+          <div class="attendance-title">
+            📋 Attendance
+            <span class="att-badge" id="attBadge">0 / 9</span>
+          </div>
+          <button class="start-btn" id="startBtn" onclick="openAttendance()">Take Attendance</button>
+        </div>
+
+        <!-- Athlete list (hidden until "Take Attendance" is tapped) -->
+        <div id="attSection" style="display:none">
+          <div class="att-progress-wrap">
+            <div class="att-progress-bar">
+              <div class="att-progress-fill" id="attProgressFill" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div class="att-list" id="attList">
+            <!-- Populated by JS -->
+          </div>
+
+          <button class="done-btn" id="doneBtn" onclick="finishAttendance()" disabled>
+            Save Attendance
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── CARD 3: Tournament ── -->
+    <div class="event-card collapsed" onclick="toggleCard(this)">
+      <div class="card-header">
+        <div class="date-badge">
+          <div class="date-day">SAT</div>
+          <div class="date-num">30</div>
+          <div class="date-month">May</div>
+        </div>
+        <div class="card-info">
+          <div class="card-title">Peach State Tournament</div>
+          <div class="card-meta">
+            <span>🕗 8:00 AM</span>
+            <span>📍 GA World Congress Ctr</span>
+          </div>
+          <div class="card-meta" style="margin-top:4px">
+            <span><span class="badge badge-tournament">Tournament</span></span>
+            <span><span class="badge badge-advanced">Advanced</span></span>
+          </div>
+        </div>
+        <div class="chevron">▾</div>
+      </div>
+    </div>
+
+    <!-- ── CARD 4: Beginner Match ── -->
+    <div class="event-card collapsed" onclick="toggleCard(this)">
+      <div class="card-header">
+        <div class="date-badge">
+          <div class="date-day">TUE</div>
+          <div class="date-num">2</div>
+          <div class="date-month">Jun</div>
+        </div>
+        <div class="card-info">
+          <div class="card-title">Scrimmage vs Pace</div>
+          <div class="card-meta">
+            <span>🕔 5:00 PM</span>
+            <span>📍 Pace Academy</span>
+          </div>
+          <div class="card-meta" style="margin-top:4px">
+            <span><span class="badge badge-match">Match</span></span>
+            <span><span class="badge" style="background:#E8F2FC;color:#1B3A5C">Beginner</span></span>
+          </div>
+        </div>
+        <div class="chevron">▾</div>
+      </div>
+    </div>
+
+  </div><!-- /scroll -->
+</div><!-- /app -->
+
+<script>
+  // ── Mock roster ─────────────────────────────────────────────────────────
+  const roster = [
+    { name: 'Marcus Johnson',   weight: 145, initials: 'MJ' },
+    { name: 'Tyler Washington', weight: 132, initials: 'TW' },
+    { name: 'Darnell Hayes',    weight: 120, initials: 'DH' },
+    { name: 'James Mitchell',   weight: 160, initials: 'JM' },
+    { name: 'Kevin Brooks',     weight: 113, initials: 'KB' },
+    { name: 'Andre Williams',   weight: 170, initials: 'AW' },
+    { name: 'DeShawn Carter',   weight: 126, initials: 'DC' },
+    { name: 'Malik Thompson',   weight: 152, initials: 'MT' },
+    { name: 'Jordan Davis',     weight: 138, initials: 'JD' },
+  ];
+
+  const attendance = {}; // athleteIndex → 'present' | 'absent'
+
+  // ── Toggle card expand/collapse ──────────────────────────────────────────
+  function toggleCard(card) {
+    const body   = card.querySelector('.card-body');
+    const header = card.querySelector('.card-header');
+    const chev   = card.querySelector('.chevron');
+    if (!body) return;
+    const isOpen = !card.classList.contains('collapsed');
+    if (isOpen) {
+      card.classList.add('collapsed');
+      header.classList.remove('open');
+      chev.style.transform = '';
+    } else {
+      card.classList.remove('collapsed');
+      header.classList.add('open');
+      chev.style.transform = 'rotate(180deg)';
+    }
+  }
+
+  // ── Open attendance mode ──────────────────────────────────────────────────
+  function openAttendance() {
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('attSection').style.display = 'block';
+    buildList();
+  }
+
+  function buildList() {
+    const list = document.getElementById('attList');
+    list.innerHTML = '';
+    roster.forEach((athlete, i) => {
+      const state = attendance[i] || 'none';
+      const row = document.createElement('div');
+      row.className = 'att-row' + (state === 'present' ? ' present' : state === 'absent' ? ' absent' : '');
+      row.id = `row-${i}`;
+      row.innerHTML = `
+        <div class="att-avatar" id="av-${i}">${athlete.initials}</div>
+        <div style="flex:1">
+          <div class="att-name">${athlete.name}</div>
+          <div class="att-weight">${athlete.weight} lbs</div>
+        </div>
+        <div class="att-btns">
+          <button class="att-btn ${state === 'present' ? 'p-active' : ''}" onclick="mark(${i},'present')">P</button>
+          <button class="att-btn ${state === 'absent'  ? 'a-active' : ''}" onclick="mark(${i},'absent')">A</button>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+    updateProgress();
+  }
+
+  // ── Mark attendance ───────────────────────────────────────────────────────
+  function mark(i, status) {
+    attendance[i] = attendance[i] === status ? 'none' : status; // tap again to unmark
+    const row = document.getElementById(`row-${i}`);
+    row.className = 'att-row' + (attendance[i] === 'present' ? ' present' : attendance[i] === 'absent' ? ' absent' : '');
+    // Update avatar
+    const av = document.getElementById(`av-${i}`);
+    av.style.background = attendance[i] === 'present' ? '#059669' : attendance[i] === 'absent' ? '#dc2626' : '#1B3A5C';
+    // Update buttons
+    const btns = row.querySelectorAll('.att-btn');
+    btns[0].className = 'att-btn' + (attendance[i] === 'present' ? ' p-active' : '');
+    btns[1].className = 'att-btn' + (attendance[i] === 'absent'  ? ' a-active' : '');
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const marked = Object.values(attendance).filter(v => v !== 'none').length;
+    const total  = roster.length;
+    const pct    = Math.round((marked / total) * 100);
+
+    document.getElementById('attProgressFill').style.width = pct + '%';
+
+    const badge = document.getElementById('attBadge');
+    badge.textContent = `${marked} / ${total}`;
+    badge.className   = 'att-badge' + (marked === total ? ' complete' : '');
+
+    document.getElementById('doneBtn').disabled = marked === 0;
+    document.getElementById('doneBtn').textContent = marked === total
+      ? '✅ Save Attendance — All Marked!'
+      : `Save Attendance (${total - marked} remaining)`;
+  }
+
+  // ── Finish attendance ─────────────────────────────────────────────────────
+  function finishAttendance() {
+    const present = Object.entries(attendance).filter(([,v]) => v === 'present').map(([i]) => roster[i].name);
+    const absent  = Object.entries(attendance).filter(([,v]) => v === 'absent' ).map(([i]) => roster[i].name);
+    const section = document.getElementById('attSection');
+
+    section.innerHTML = `
+      <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:12px 14px;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700;color:#065f46;margin-bottom:6px">✅ Attendance Saved</div>
+        <div style="font-size:12px;color:#065f46">
+          <strong>${present.length} present:</strong> ${present.join(', ') || 'none'}<br>
+          <strong>${absent.length} absent:</strong> ${absent.join(', ') || 'none'}
+        </div>
+      </div>
+      <button onclick="editAttendance()" style="width:100%;padding:9px;border-radius:10px;border:1px solid #dde3ea;background:#fff;font-size:12px;font-weight:600;color:#4a5568;cursor:pointer;font-family:inherit">
+        Edit Attendance
+      </button>
+    `;
+
+    document.getElementById('attBadge').className = 'att-badge complete';
+    document.getElementById('startBtn').style.display = 'none';
+  }
+
+  function editAttendance() {
+    document.getElementById('attSection').style.display = 'none';
+    document.getElementById('attSection').innerHTML = ''; // reset
+    document.getElementById('attSection').style.display = 'block';
+    // rebuild
+    document.getElementById('attSection').innerHTML = `
+      <div class="att-progress-wrap">
+        <div class="att-progress-bar">
+          <div class="att-progress-fill" id="attProgressFill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="att-list" id="attList"></div>
+      <button class="done-btn" id="doneBtn" onclick="finishAttendance()" disabled>Save Attendance</button>
+    `;
+    buildList();
+  }
+</script>
+</body>
+</html>

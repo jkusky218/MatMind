@@ -248,7 +248,7 @@ export default function ChannelThread({
   messages,
   onBack,
   onSendMessage,
-  roster, events, availability, attendance,
+  roster, events, availability, attendance, kbEntries,
   setRoster, setEvents, setAvailability,
   createEvent,
   updateAvailabilityEntry,
@@ -290,7 +290,7 @@ export default function ChannelThread({
       // ── 1. Get Claude's response (it includes structured intents when needed) ──
       const resp = await sendToMatMind(
         text,
-        { roster, events, availability, attendance: attendance ?? {}, userRole: userRole ?? 'coach', userName: senderName ?? 'Coach' },
+        { roster, events, availability, attendance: attendance ?? {}, kbEntries: kbEntries ?? [], userRole: userRole ?? 'coach', userName: senderName ?? 'Coach' },
         history,
       );
 
