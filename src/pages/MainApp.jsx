@@ -3,6 +3,7 @@ import { BRAND } from '../lib/constants';
 import { Brain, Chat, Calendar, Users, UserIcon, BookOpen, Settings } from '../components/Icons';
 import SettingsPage from '../components/SettingsPage';
 import { useTeamData } from '../hooks/useTeamData';
+import { useTeamSettings } from '../hooks/useTeamSettings';
 import ChannelList       from '../components/ChannelList';
 import ChannelThread     from '../components/ChannelThread';
 import ScheduleTab       from '../components/ScheduleTab';
@@ -157,6 +158,8 @@ export default function MainApp({ auth }) {
   const isCoach = auth.profile?.role === 'coach' || auth.profile?.role === 'admin' || !auth.profile;
   const isAdmin = auth.profile?.role === 'admin';
 
+  const { settings: teamSettings } = useTeamSettings(auth);
+
   function handleMemberAdded({ type, data }) {
     if (type === 'coach' && data) {
       // The admin API returns the coaches row; the profile has the full_name but
@@ -169,7 +172,7 @@ export default function MainApp({ auth }) {
           id: data.id,
           name: 'New Coach',         // refreshed on next load when profile is fetched
           weight: null, grade: null,
-          school: 'Lovett',
+          school: teamSettings.school,
           group: data.roster_group ?? 'coaches',
           role: data.title ?? 'Coach',
           parent1: null, parent2: null,
@@ -229,7 +232,7 @@ export default function MainApp({ auth }) {
           <div style={{ flex: 1 }}>
             <p style={{ fontWeight: 700, fontSize: 16, color: '#fff', margin: 0, letterSpacing: -0.3 }}>MatMind</p>
             <p style={{ fontSize: 11, color: BRAND.columbiaMid, margin: 0 }}>
-              Lovett Wrestling{isDemo ? ' · Demo' : ''}
+              {teamSettings.teamName}{isDemo ? ' · Demo' : ''}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -289,12 +292,14 @@ export default function MainApp({ auth }) {
         open={adminOpen}
         onClose={() => setAdminOpen(false)}
         onMemberAdded={handleMemberAdded}
+        teamId={auth.profile?.team_id}
+        defaultSchool={teamSettings.school}
       />
 
       {/* ── Content ── */}
       <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)', position: 'relative' }}>
         {settingsOpen ? (
-          <SettingsPage auth={auth} onClose={() => setSettingsOpen(false)} />
+          <SettingsPage auth={auth} teamSettings={teamSettings} onClose={() => setSettingsOpen(false)} />
         ) : activeChannel ? (
           <ChannelThread
             channel={activeChannel}
@@ -313,6 +318,7 @@ export default function MainApp({ auth }) {
             updateAvailabilityEntry={updateAvailabilityEntry}
             senderName={auth.profile?.full_name}
             userRole={auth.profile?.role ?? 'coach'}
+            teamSettings={teamSettings}
           />
         ) : (
           <>

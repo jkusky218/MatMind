@@ -43,7 +43,7 @@ function SelectField({ label, id, required, children, value, onChange }) {
 
 // ── Add Coach Form ────────────────────────────────────────────────────────────
 
-function AddCoachForm({ onSuccess }) {
+function AddCoachForm({ onSuccess, teamId }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '', title: '', group: '' });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // {ok, message}
@@ -60,7 +60,7 @@ function AddCoachForm({ onSuccess }) {
       const res = await fetch(ADMIN_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add_coach', data: form }),
+        body: JSON.stringify({ action: 'add_coach', data: form, teamId }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
@@ -161,9 +161,9 @@ function ParentSection({ label, value, onChange }) {
   );
 }
 
-function AddAthleteForm({ onSuccess }) {
+function AddAthleteForm({ onSuccess, teamId, defaultSchool = '' }) {
   const [form, setForm] = useState({
-    firstName: '', lastName: '', weight: '', grade: '', school: 'Lovett', group: '',
+    firstName: '', lastName: '', weight: '', grade: '', school: defaultSchool, group: '',
   });
   const [parent1, setParent1] = useState({ name: '', email: '', phone: '' });
   const [parent2, setParent2] = useState({ name: '', email: '', phone: '' });
@@ -189,7 +189,7 @@ function AddAthleteForm({ onSuccess }) {
       const res = await fetch(ADMIN_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add_athlete', data: payload }),
+        body: JSON.stringify({ action: 'add_athlete', data: payload, teamId }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
@@ -197,7 +197,7 @@ function AddAthleteForm({ onSuccess }) {
           ? ` (${json.warnings.length} parent invite warning${json.warnings.length > 1 ? 's' : ''})`
           : '';
         setResult({ ok: true, message: json.message + warningNote, warnings: json.warnings });
-        setForm({ firstName: '', lastName: '', weight: '', grade: '', school: 'Lovett', group: '' });
+        setForm({ firstName: '', lastName: '', weight: '', grade: '', school: defaultSchool, group: '' });
         setParent1({ name: '', email: '', phone: '' });
         setParent2({ name: '', email: '', phone: '' });
         setShowP2(false);
@@ -248,7 +248,7 @@ function AddAthleteForm({ onSuccess }) {
         />
         <Field
           label="School" id="ath-school"
-          placeholder="Lovett"
+          placeholder={defaultSchool || 'School name'}
           value={form.school} onChange={set('school')}
         />
       </div>
@@ -302,7 +302,7 @@ function AddAthleteForm({ onSuccess }) {
 
 // ── AdminPanel (bottom sheet) ─────────────────────────────────────────────────
 
-export default function AdminPanel({ open, onClose, onMemberAdded }) {
+export default function AdminPanel({ open, onClose, onMemberAdded, teamId, defaultSchool }) {
   const [activeTab, setActiveTab] = useState('athlete');
 
   if (!open) return null;
@@ -367,8 +367,8 @@ export default function AdminPanel({ open, onClose, onMemberAdded }) {
         {/* Scrollable form area */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 32px' }}>
           {activeTab === 'coach'
-            ? <AddCoachForm onSuccess={onMemberAdded} />
-            : <AddAthleteForm onSuccess={onMemberAdded} />
+            ? <AddCoachForm onSuccess={onMemberAdded} teamId={teamId} />
+            : <AddAthleteForm onSuccess={onMemberAdded} teamId={teamId} defaultSchool={defaultSchool} />
           }
         </div>
       </div>

@@ -24,7 +24,7 @@ export default function LoginScreen({ auth }) {
       padding: '0 32px',
     }}>
       <h1 style={{ fontSize: 28, fontWeight: 700, color: '#fff', marginBottom: 4 }}>MatMind</h1>
-      <p style={{ fontSize: 13, color: '#A5D0F0', marginBottom: 32 }}>Lovett Wrestling AI Assistant</p>
+      <p style={{ fontSize: 13, color: '#A5D0F0', marginBottom: 32 }}>AI Team Assistant</p>
 
       <div style={{ width: '100%', maxWidth: 340 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>

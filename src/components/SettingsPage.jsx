@@ -266,7 +266,8 @@ function NotifChannelRow({ label, icon, coachEnabled, parentEnabled, last }) {
 
 // ── Main SettingsPage ─────────────────────────────────────────────────────────
 
-export default function SettingsPage({ auth, onClose }) {
+export default function SettingsPage({ auth, teamSettings = {}, onClose }) {
+  const teamName = teamSettings.teamName || 'My Team';
   const profile  = auth.profile;
   const isAdmin  = profile?.role === 'admin';
   const isCoach  = profile?.role === 'coach' || profile?.role === 'admin';
@@ -336,7 +337,7 @@ export default function SettingsPage({ auth, onClose }) {
             sublabel={auth.user?.email ?? 'Not signed in'}
             last={false} />
           <Row icon="🏫" label="Team"
-            sublabel={isAdmin ? 'Lovett Wrestling · Admin access' : 'Lovett Wrestling'}
+            sublabel={isAdmin ? `${teamName} · Admin access` : teamName}
             last />
         </Card>
 
@@ -358,10 +359,10 @@ export default function SettingsPage({ auth, onClose }) {
             {/* Team Branding */}
             <SectionLabel adminOnly>Team Branding</SectionLabel>
             <Card>
-              <Row icon="🦁" label="Team Name"   sublabel="Lovett Wrestling" chevron tag="Soon" />
+              <Row icon="🏆" label="Team Name"   sublabel={teamName} chevron tag="Soon" />
               <Row icon="🎨" label="Logo"        sublabel="Upload team logo"  chevron tag="Soon" />
-              <Row icon="🔵" label="Primary Color"   sublabel="#1B3A5C · Navy"   chevron tag="Soon" />
-              <Row icon="🔷" label="Secondary Color"  sublabel="#6BADE4 · Columbia" chevron tag="Soon" last />
+              <Row icon="🔵" label="Primary Color"   sublabel={teamSettings.primaryColor   || '#1B3A5C'} chevron tag="Soon" />
+              <Row icon="🔷" label="Secondary Color"  sublabel={teamSettings.secondaryColor || '#6BADE4'} chevron tag="Soon" last />
             </Card>
             <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
               Branding updates will apply across the entire app for all team members.
@@ -421,7 +422,7 @@ export default function SettingsPage({ auth, onClose }) {
         </Card>
 
         <p style={{ fontSize: 11, color: '#c8d0da', textAlign: 'center', margin: '24px 0 0' }}>
-          MatMind · Lovett Wrestling{isAdmin ? ' · Admin' : ''}
+          MatMind · {teamName}{isAdmin ? ' · Admin' : ''}
         </p>
       </div>
     </div>

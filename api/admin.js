@@ -4,8 +4,6 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const TEAM_ID = 'a1b2c3d4-0000-0000-0000-000000000001'; // Lovett Wrestling
-
 function makeAdminClient() {
   const url = process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -29,13 +27,14 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 
-  const { action, data } = req.body ?? {};
-  if (!action) return res.status(400).json({ error: 'action is required' });
+  const { action, data, teamId } = req.body ?? {};
+  if (!action)  return res.status(400).json({ error: 'action is required' });
+  if (!teamId)  return res.status(400).json({ error: 'teamId is required' });
 
   try {
     switch (action) {
-      case 'add_coach':   return res.status(200).json(await addCoach(admin, data));
-      case 'add_athlete': return res.status(200).json(await addAthlete(admin, data));
+      case 'add_coach':   return res.status(200).json(await addCoach(admin, data, teamId));
+      case 'add_athlete': return res.status(200).json(await addAthlete(admin, data, teamId));
       default:            return res.status(400).json({ error: `Unknown action: ${action}` });
     }
   } catch (err) {
@@ -64,10 +63,10 @@ async function resolveAuthUser(admin, email, fullName, role) {
 }
 
 /** Upsert a profile row (requires auth user to already exist). */
-async function upsertProfile(admin, { userId, name, email, phone, role }) {
+async function upsertProfile(admin, { userId, name, email, phone, role, teamId }) {
   const { error } = await admin.from('profiles').upsert({
     id: userId,
-    team_id: TEAM_ID,
+    team_id: teamId,
     full_name: name,
     email: email.toLowerCase(),
     phone: phone || null,
@@ -79,17 +78,17 @@ async function upsertProfile(admin, { userId, name, email, phone, role }) {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-async function addCoach(admin, { name, email, phone, title, group } = {}) {
+async function addCoach(admin, { name, email, phone, title, group } = {}, teamId) {
   if (!name?.trim()) throw new Error('Name is required');
   if (!email?.trim()) throw new Error('Email is required');
 
   const { userId, isNew } = await resolveAuthUser(admin, email.trim(), name.trim(), 'coach');
-  await upsertProfile(admin, { userId, name: name.trim(), email: email.trim(), phone, role: 'coach' });
+  await upsertProfile(admin, { userId, name: name.trim(), email: email.trim(), phone, role: 'coach', teamId });
 
   const { data: coach, error: coachErr } = await admin
     .from('coaches')
     .upsert({
-      team_id: TEAM_ID,
+      team_id: teamId,
       profile_id: userId,
       title: title?.trim() || 'Coach',
       roster_group: group || null,
@@ -108,7 +107,7 @@ async function addCoach(admin, { name, email, phone, title, group } = {}) {
   };
 }
 
-async function addAthlete(admin, { firstName, lastName, weight, grade, school, group, parent1, parent2 } = {}) {
+async function addAthlete(admin, { firstName, lastName, weight, grade, school, group, parent1, parent2 } = {}, teamId) {
   if (!firstName?.trim()) throw new Error('First name is required');
   if (!lastName?.trim())  throw new Error('Last name is required');
   if (!group)             throw new Error('Roster group is required');
@@ -116,12 +115,12 @@ async function addAthlete(admin, { firstName, lastName, weight, grade, school, g
   const { data: athlete, error: athErr } = await admin
     .from('athletes')
     .insert({
-      team_id: TEAM_ID,
+      team_id: teamId,
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       weight: weight ? parseFloat(weight) : null,
       grade: grade?.trim() || null,
-      school: school?.trim() || 'Lovett',
+      school: school?.trim() || null,
       roster_group: group,
       active: true,
     })
@@ -141,6 +140,7 @@ async function addAthlete(admin, { firstName, lastName, weight, grade, school, g
         email: pData.email.trim(),
         phone: pData.phone || null,
         role: 'parent',
+        teamId,
       });
       const { error: linkErr } = await admin.from('athlete_parents').upsert({
         athlete_id: athlete.id,

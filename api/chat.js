@@ -9,13 +9,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName } = req.body;
+  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName = 'My Team', gymName = 'Team Gym' } = req.body;
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
-  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, knowledgeBase, channels, userRole, userName });
+  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName, gymName });
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
-        tools: [buildScheduleTool(), buildPostMessageTool()],
+        tools: [buildScheduleTool(teamName), buildPostMessageTool()],
         tool_choice: { type: 'auto' },
         system: [
           {
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
           title: e.title,
           date: e.date,
           time: e.time,
-          location: e.location || 'Lovett Gym',
+          location: e.location || gymName,
           group: e.group || 'all',
           eventType: e.eventType || 'practice',
         }));
@@ -151,11 +151,11 @@ function buildPostMessageTool() {
   };
 }
 
-function buildScheduleTool() {
+function buildScheduleTool(teamName = 'the team') {
   return {
     name: 'schedule_events',
     description:
-      'Add one or more events to the Lovett Wrestling schedule. ' +
+      `Add one or more events to the ${teamName} schedule. ` +
       'Call this whenever the coach asks to create, add, or schedule any practice, match, tournament, or other event. ' +
       'For recurring events (e.g. "every Monday in June") include one object per occurrence with exact YYYY-MM-DD dates. ' +
       'For events targeting multiple groups (e.g. "Beginner and Advanced") include a separate object per group per date.',
@@ -228,7 +228,7 @@ function buildAttendanceSummary(attendance = {}, roster = []) {
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
-function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, knowledgeBase = [], userRole = 'coach', userName = 'Coach' }) {
+function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, knowledgeBase = [], userRole = 'coach', userName = 'Coach', teamName = 'My Team', gymName = 'Team Gym' }) {
   const athletes = roster.filter(r => r.group !== 'coaches');
   const coaches  = roster.filter(r => r.group === 'coaches');
 
@@ -258,7 +258,7 @@ function buildSystemPrompt({ roster = [], events = [], availability = {}, attend
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  return `You are MatMind, an AI assistant for Lovett Wrestling (The Lovett School, Atlanta, GA). Mascot: Lions 🦁
+  return `You are MatMind, an AI assistant for ${teamName}. Default event location: ${gymName}.
 
 You are talking to ${userName} (${userRole}). Today is ${today}.
 

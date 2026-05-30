@@ -29,7 +29,7 @@ async function executeClaudeIntents(intents, { createEvent, updateAvailabilityEn
         type: intent.eventType || 'practice',
         date: intent.date,
         time: intent.time || '6:00 PM',
-        location: intent.location || 'Lovett Gym',
+        location: intent.location || gymName,
         group,
       });
       if (result?.ok === false) {
@@ -113,7 +113,7 @@ async function executeIntents(message, { roster, events, createEvent, updateAvai
     const date  = dayMatch ? getNextWeekdayDate(day) : localDateStr(new Date());
     const label = day === 'Tomorrow' ? 'Practice' : `${day} Practice`;
     console.log('[MatMind] createEvent:', { label, date, time, group });
-    const result = await createEvent({ title: label, type: 'practice', date, time, location: 'Lovett Gym', group });
+    const result = await createEvent({ title: label, type: 'practice', date, time, location: gymName, group });
     if (result?.ok === false) {
       errors.push(`Could not save ${label} to the database: ${result.error}`);
     } else {
@@ -207,7 +207,7 @@ function generateFallbackResponse(message, roster, events, availability) {
     const groupLabel = group ? GROUP_LABELS[group] : 'all families';
     const parents    = filtered.reduce((n, r) => n + 1 + (r.parent2 ? 1 : 0), 0);
     return {
-      text: `I've drafted a reminder for **${groupLabel}**:\n\n> *"Hi Lovett Wrestling families! Quick reminder about upcoming events. Please confirm your availability in MatMind. Go Lions! 🦁"*`,
+      text: `I've drafted a reminder for **${groupLabel}**:\n\n> *"Hi ${teamName} families! Quick reminder about upcoming events. Please confirm your availability in MatMind."*`,
       actions: [`Drafted for ${filtered.length} athletes (${parents} parent contacts)`, 'Ready to send via email + post to channel'],
       followUp: 'Send this via email, post to the channel, or both?',
     };
@@ -215,7 +215,7 @@ function generateFallbackResponse(message, roster, events, availability) {
 
   if (lower.includes('roster') || lower.includes('how many') || lower.includes('athletes')) {
     const counts = Object.fromEntries(GROUPS.map(g => [g, roster.filter(r => r.group === g).length]));
-    return { text: `Lovett Wrestling roster:\n\n⭐ **${counts.coaches} Coaches**\n🟢 **${counts.advanced} Advanced** (skill-based)\n🔵 **${counts.beginner} Beginner** (skill-based)\n🟣 **${counts.tots} Tots**\n\n**${athletes.length} total athletes**.`, actions: [] };
+    return { text: `${teamName} roster:\n\n⭐ **${counts.coaches} Coaches**\n🟢 **${counts.advanced} Advanced** (skill-based)\n🔵 **${counts.beginner} Beginner** (skill-based)\n🟣 **${counts.tots} Tots**\n\n**${athletes.length} total athletes**.`, actions: [] };
   }
 
   if (lower.includes('this week') || lower.includes('upcoming') || lower.includes("what's coming") || lower.includes('schedule')) {
@@ -254,7 +254,10 @@ export default function ChannelThread({
   updateAvailabilityEntry,
   senderName,
   userRole,
+  teamSettings = {},
 }) {
+  const teamName = teamSettings.teamName || 'Team';
+  const gymName  = teamSettings.gymName  || 'Team Gym';
   const isAI     = channel.id === 'ai';
   const confirmed = Object.values(availability).filter(v => v === 'confirmed').length;
 
@@ -290,7 +293,7 @@ export default function ChannelThread({
       // ── 1. Get Claude's response (it includes structured intents when needed) ──
       const resp = await sendToMatMind(
         text,
-        { roster, events, availability, attendance: attendance ?? {}, kbEntries: kbEntries ?? [], userRole: userRole ?? 'coach', userName: senderName ?? 'Coach' },
+        { roster, events, availability, attendance: attendance ?? {}, kbEntries: kbEntries ?? [], userRole: userRole ?? 'coach', userName: senderName ?? 'Coach', teamName, gymName },
         history,
       );
 

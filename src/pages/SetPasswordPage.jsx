@@ -15,7 +15,7 @@ export default function SetPasswordPage({ isRecovery = false, onComplete }) {
   const title    = isRecovery ? 'Reset your password' : 'Welcome to MatMind!';
   const subtitle = isRecovery
     ? 'Enter a new password for your account.'
-    : 'Your coach has added you to Lovett Wrestling. Set a password to get started.';
+    : 'Your coach has added you to the team. Set a password to get started.';
 
   const handleSubmit = async () => {
     setError(null);

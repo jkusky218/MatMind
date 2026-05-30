@@ -34,7 +34,7 @@ function normalizeCoach(c) {
     name: p?.full_name ?? 'Coach',
     weight: null,
     grade: null,
-    school: 'Lovett',
+    school: null,
     group: 'coaches',
     role: c.title ?? 'Coach',
     parent1: p ? { name: p.full_name, email: p.email, phone: p.phone } : null,
@@ -247,7 +247,7 @@ export function useTeamData(auth) {
   }, [teamId]);
 
   // ── createEvent ─────────────────────────────────────────────────────────────
-  const createEvent = useCallback(async ({ title, type = 'practice', date, time, location = 'Lovett Gym', group = 'all' }) => {
+  const createEvent = useCallback(async ({ title, type = 'practice', date, time, location = '', group = 'all' }) => {
     const tempId = `local-${Date.now()}`;
     const normalized = { id: tempId, title, type, date, time, location, group };
     setEvents(prev => [...prev, normalized]);

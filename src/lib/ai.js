@@ -25,6 +25,8 @@ export async function sendToMatMind(message, context = {}, history = []) {
         channels:      context.channels     || [],
         userRole:      context.userRole     || 'coach',
         userName:      context.userName     || 'Coach',
+        teamName:      context.teamName     || 'My Team',
+        gymName:       context.gymName      || 'Team Gym',
       }),
     });
 
