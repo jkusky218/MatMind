@@ -76,8 +76,23 @@ function normalizeMessage(m) {
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
+function normalizeParent(p) {
+  return {
+    id: p.id,
+    name: p.full_name,
+    email: p.email,
+    phone: p.phone,
+    athletes: (p.athlete_parents ?? []).map(ap => ({
+      id: ap.athletes?.id,
+      name: ap.athletes ? `${ap.athletes.first_name} ${ap.athletes.last_name}` : '',
+      group: ap.athletes?.roster_group,
+    })).filter(a => a.id),
+  };
+}
+
 export function useTeamData(auth) {
   const [roster, setRoster] = useState([]);
+  const [parents, setParents] = useState([]);
   const [events, setEvents] = useState([]);
   const [availability, setAvailability] = useState({});
   const [attendance, setAttendance] = useState({});
@@ -98,6 +113,18 @@ export function useTeamData(auth) {
     setAvailability(INITIAL_AVAILABILITY);
     setAttendance({});          // no prior attendance in demo — coach takes it live
     setChannelMessages(INITIAL_CHANNEL_MESSAGES);
+    // Derive demo parents from roster's parent1/parent2 data
+    const demoParentMap = new Map();
+    INITIAL_ROSTER.filter(m => m.group !== 'coaches').forEach(athlete => {
+      [athlete.parent1, athlete.parent2].filter(Boolean).forEach(p => {
+        if (!p.email) return;
+        if (!demoParentMap.has(p.email)) {
+          demoParentMap.set(p.email, { id: p.email, name: p.name, email: p.email, phone: p.phone, athletes: [] });
+        }
+        demoParentMap.get(p.email).athletes.push({ id: athlete.id, name: athlete.name, group: athlete.group });
+      });
+    });
+    setParents([...demoParentMap.values()]);
     setLoading(false);
   }, []);
 
@@ -139,6 +166,19 @@ export function useTeamData(auth) {
         ...(athleteRows ?? []).map(normalizeAthlete),
       ];
       setRoster(normalizedRoster);
+
+      // Parents
+      const { data: parentRows } = await supabase
+        .from('profiles')
+        .select(`
+          id, full_name, email, phone,
+          athlete_parents!parent_id(
+            athletes(id, first_name, last_name, roster_group)
+          )
+        `)
+        .eq('team_id', teamId)
+        .eq('role', 'parent');
+      setParents((parentRows ?? []).map(normalizeParent));
 
       // Events
       const today = new Date().toISOString().slice(0, 10);
@@ -387,6 +427,7 @@ export function useTeamData(auth) {
   return {
     roster,
     setRoster,
+    parents,
     events,
     setEvents,
     availability,

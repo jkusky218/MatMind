@@ -137,6 +137,7 @@ export default function MainApp({ auth }) {
 
   const {
     roster, setRoster,
+    parents,
     events, setEvents,
     availability, setAvailability,
     attendance, recordAttendance,
@@ -342,7 +343,7 @@ export default function MainApp({ auth }) {
               />
             )}
             {tab === 'roster' && (
-              <RosterTab roster={roster} />
+              <RosterTab roster={roster} parents={parents} />
             )}
             {tab === 'kb' && (
               <KnowledgeBaseTab
