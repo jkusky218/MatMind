@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { BRAND } from '../lib/constants';
-import { Brain, Chat, Calendar, Users, UserIcon, BookOpen } from '../components/Icons';
+import { Brain, Chat, Calendar, Users, UserIcon, BookOpen, Settings } from '../components/Icons';
+import SettingsPage from '../components/SettingsPage';
 import { useTeamData } from '../hooks/useTeamData';
 import ChannelList       from '../components/ChannelList';
 import ChannelThread     from '../components/ChannelThread';
@@ -131,6 +132,7 @@ export default function MainApp({ auth }) {
   const [tab, setTab]                 = useState('messages');
   const [activeChannel, setActiveChannel] = useState(null);
   const [adminOpen, setAdminOpen]     = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const {
     roster, setRoster,
@@ -153,6 +155,7 @@ export default function MainApp({ auth }) {
   const [notifyOpen, setNotifyOpen] = useState(false);
 
   const isCoach = auth.profile?.role === 'coach' || auth.profile?.role === 'admin' || !auth.profile;
+  const isAdmin = auth.profile?.role === 'admin';
 
   function handleMemberAdded({ type, data }) {
     if (type === 'coach' && data) {
@@ -230,10 +233,6 @@ export default function MainApp({ auth }) {
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 11, color: BRAND.columbiaMid, display: 'flex', alignItems: 'center', gap: 4 }}>
-              {UserIcon(12, BRAND.columbiaMid)}
-              <span style={{ textTransform: 'capitalize' }}>{auth.profile?.role ?? 'coach'}</span>
-            </div>
             {isCoach && push.subscribed && (
               <button onClick={() => setNotifyOpen(true)} title="Send push notification" style={{
                 background: 'rgba(107,173,228,0.18)', border: '1px solid rgba(107,173,228,0.3)',
@@ -246,15 +245,14 @@ export default function MainApp({ auth }) {
                 background: 'rgba(107,173,228,0.18)', border: '1px solid rgba(107,173,228,0.3)',
                 borderRadius: 8, padding: '5px 9px', fontSize: 16, color: BRAND.columbia,
                 cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center',
-              }}>
-                +
-              </button>
+              }}>+</button>
             )}
-            <button onClick={auth.signOut} style={{
-              marginLeft: 2, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
-              padding: '5px 10px', fontSize: 11, color: BRAND.columbiaMid, cursor: 'pointer',
+            <button onClick={() => setSettingsOpen(true)} title="Settings" style={{
+              background: 'rgba(107,173,228,0.18)', border: '1px solid rgba(107,173,228,0.3)',
+              borderRadius: 8, padding: '5px 9px', color: BRAND.columbia,
+              cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center',
             }}>
-              Sign out
+              {Settings(16, BRAND.columbia)}
             </button>
           </div>
         </div>
@@ -294,8 +292,10 @@ export default function MainApp({ auth }) {
       />
 
       {/* ── Content ── */}
-      <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        {activeChannel ? (
+      <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)', position: 'relative' }}>
+        {settingsOpen ? (
+          <SettingsPage auth={auth} onClose={() => setSettingsOpen(false)} />
+        ) : activeChannel ? (
           <ChannelThread
             channel={activeChannel}
             messages={channelMessages[activeChannel.id] ?? []}
