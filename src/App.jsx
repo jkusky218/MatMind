@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
+import { useTeamResolver } from './hooks/useTeamResolver';
 import LoginScreen from './pages/LoginScreen';
 import MainApp from './pages/MainApp';
 import SetPasswordPage from './pages/SetPasswordPage';
@@ -12,6 +13,7 @@ const _authType = _params.get('type'); // 'invite' | 'recovery' | null
 
 export default function App() {
   const auth = useAuth();
+  const { teamBranding, loading: brandingLoading, notFound } = useTeamResolver();
 
   // Track whether this page load came from an invite or password-reset link.
   // We derive it only once from the captured hash; onComplete clears it.
@@ -19,16 +21,41 @@ export default function App() {
     () => _authType === 'invite' || _authType === 'recovery'
   );
 
-  // ── Loading spinner ─────────────────────────────────────────────────────────
-  if (auth.loading) {
+  // Primary color for the loading/error screens — use team color if resolved
+  const primary   = teamBranding?.primaryColor   || '#1B3A5C';
+  const primaryDk = primary; // darker shade could be derived later
+  const secondary = teamBranding?.secondaryColor || '#6BADE4';
+
+  // ── Team not found ──────────────────────────────────────────────────────────
+  if (notFound) {
     return (
       <div style={{
         height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(145deg, #0F2440 0%, #1B3A5C 100%)',
+        background: 'linear-gradient(145deg, #1a1a2e 0%, #16213e 100%)', padding: '0 32px',
       }}>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 8 }}>MatMind</p>
-          <p style={{ fontSize: 13, color: '#A5D0F0' }}>Loading…</p>
+          <p style={{ fontSize: 32, marginBottom: 12 }}>🤷</p>
+          <p style={{ fontSize: 18, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Team not found</p>
+          <p style={{ fontSize: 13, color: '#aaa' }}>
+            The link you followed doesn't match any team.<br />Contact your coach for the correct URL.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Loading spinner (auth or branding) ─────────────────────────────────────
+  if (auth.loading || brandingLoading) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: `linear-gradient(145deg, ${primaryDk} 0%, ${primary} 100%)`,
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
+            {teamBranding?.teamName || 'MatMind'}
+          </p>
+          <p style={{ fontSize: 13, color: secondary }}>Loading…</p>
         </div>
       </div>
     );
@@ -42,13 +69,14 @@ export default function App() {
       <SetPasswordPage
         isRecovery={_authType === 'recovery'}
         onComplete={() => setNeedsSetPassword(false)}
+        teamBranding={teamBranding}
       />
     );
   }
 
   // ── Normal auth flow ────────────────────────────────────────────────────────
   if (!auth.user) {
-    return <LoginScreen auth={auth} />;
+    return <LoginScreen auth={auth} teamBranding={teamBranding} />;
   }
 
   return <MainApp auth={auth} />;

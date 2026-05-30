@@ -5,17 +5,21 @@ import { supabase } from '../lib/supabase';
 // Supabase auto-processes the hash tokens and signs them in; we just
 // need to let them set their actual password before entering the app.
 
-export default function SetPasswordPage({ isRecovery = false, onComplete }) {
+export default function SetPasswordPage({ isRecovery = false, onComplete, teamBranding }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
   const [done, setDone]         = useState(false);
 
-  const title    = isRecovery ? 'Reset your password' : 'Welcome to MatMind!';
+  const teamName = teamBranding?.teamName || null;
+  const primaryColor   = teamBranding?.primaryColor   || '#1B3A5C';
+  const secondaryColor = teamBranding?.secondaryColor || '#6BADE4';
+
+  const title    = isRecovery ? 'Reset your password' : `Welcome to${teamName ? ' ' + teamName : ' MatMind'}!`;
   const subtitle = isRecovery
     ? 'Enter a new password for your account.'
-    : 'Your coach has added you to the team. Set a password to get started.';
+    : `Your coach has added you to ${teamName || 'the team'}. Set a password to get started.`;
 
   const handleSubmit = async () => {
     setError(null);
@@ -43,7 +47,7 @@ export default function SetPasswordPage({ isRecovery = false, onComplete }) {
   const wrap = {
     height: '100vh', display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    background: 'linear-gradient(145deg, #0F2440 0%, #1B3A5C 50%, #2A4F7A 100%)',
+    background: `linear-gradient(145deg, ${primaryColor}dd 0%, ${primaryColor} 50%, ${primaryColor}bb 100%)`,
     padding: '0 32px',
   };
   const inputStyle = {
@@ -104,7 +108,7 @@ export default function SetPasswordPage({ isRecovery = false, onComplete }) {
           style={{
             width: '100%', padding: '14px 0', borderRadius: 12, border: 'none',
             cursor: loading ? 'not-allowed' : 'pointer',
-            background: loading ? '#4A7FA8' : '#6BADE4',
+            background: loading ? `${secondaryColor}99` : secondaryColor,
             color: '#0F2440', fontSize: 15, fontWeight: 700,
           }}
         >
