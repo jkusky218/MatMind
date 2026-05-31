@@ -49,14 +49,15 @@ export default async function handler(req, res) {
   // - Exclude the sender (don't notify yourself)
   let query = admin
     .from('push_subscriptions')
-    .select('subscription, user_id')
-    .eq('team_id', teamId);
+    .select('subscription, user_id');
 
   if (targetUserId) {
-    // Test mode: deliver only to this user's devices, ignoring channel prefs
-    // and sender exclusion so they can verify push works on their own device.
+    // Test mode: deliver to ALL of this user's devices regardless of which team
+    // they subscribed under (a super admin's row may carry a stale team_id),
+    // ignoring channel prefs and sender exclusion so they can verify delivery.
     query = query.eq('user_id', targetUserId);
   } else {
+    query = query.eq('team_id', teamId);
     if (channelSlug) {
       // contains() checks that channel_prefs array includes the slug
       query = query.contains('channel_prefs', [channelSlug]);
