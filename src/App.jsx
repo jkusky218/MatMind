@@ -79,5 +79,11 @@ export default function App() {
     return <LoginScreen auth={auth} teamBranding={teamBranding} />;
   }
 
-  return <MainApp auth={auth} />;
+  // Override profile.team_id with the subdomain-resolved teamId so all data
+  // hooks load the correct team regardless of which team_id is in the DB row.
+  const resolvedAuth = teamBranding?.teamId && auth.profile
+    ? { ...auth, profile: { ...auth.profile, team_id: teamBranding.teamId } }
+    : auth;
+
+  return <MainApp auth={resolvedAuth} />;
 }
