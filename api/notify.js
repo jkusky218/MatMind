@@ -32,6 +32,7 @@ export default async function handler(req, res) {
     teamId,
     channelSlug,   // which channel triggered the notification
     senderUserId,  // exclude this user (don't ping yourself)
+    targetUserId,  // when set, send ONLY to this user (used by the "test" button)
   } = req.body ?? {};
 
   if (!title || !body) return res.status(400).json({ error: 'title and body are required' });
@@ -51,20 +52,28 @@ export default async function handler(req, res) {
     .select('subscription, user_id')
     .eq('team_id', teamId);
 
-  if (channelSlug) {
-    // contains() checks that channel_prefs array includes the slug
-    query = query.contains('channel_prefs', [channelSlug]);
-  }
-
-  if (senderUserId) {
-    query = query.neq('user_id', senderUserId);
+  if (targetUserId) {
+    // Test mode: deliver only to this user's devices, ignoring channel prefs
+    // and sender exclusion so they can verify push works on their own device.
+    query = query.eq('user_id', targetUserId);
+  } else {
+    if (channelSlug) {
+      // contains() checks that channel_prefs array includes the slug
+      query = query.contains('channel_prefs', [channelSlug]);
+    }
+    if (senderUserId) {
+      query = query.neq('user_id', senderUserId);
+    }
   }
 
   const { data: subs, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   if (!subs?.length) return res.status(200).json({ sent: 0, failed: 0, message: 'No subscribers' });
 
-  const payload = JSON.stringify({ title, body, url, tag: `matmind-${channelSlug || 'alert'}` });
+  // Unique tag per send so iOS reliably alerts on every message instead of
+  // silently collapsing repeats to the same channel into one notification.
+  const tag = `matmind-${channelSlug || 'alert'}-${Date.now()}`;
+  const payload = JSON.stringify({ title, body, url, tag });
 
   let sent = 0, failed = 0;
   const staleEndpoints = [];

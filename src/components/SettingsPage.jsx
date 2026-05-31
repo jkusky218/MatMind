@@ -630,6 +630,56 @@ function NotifChannelRow({ label, icon, coachEnabled, parentEnabled, last }) {
   );
 }
 
+// ── Test Notification button ──────────────────────────────────────────────────
+// Sends a push only to the current user's devices so they can verify delivery
+// without a second device (channel-message notifications exclude the sender).
+
+function TestNotifButton({ teamId, userId }) {
+  const [state, setState] = useState('idle'); // idle | sending | sent | none | error
+
+  async function send() {
+    if (state === 'sending') return;
+    setState('sending');
+    try {
+      const res = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: '🦁 MatMind',
+          body:  'Test notification — push is working!',
+          teamId,
+          targetUserId: userId,
+        }),
+      });
+      const data = await res.json();
+      setState(res.ok && data.sent > 0 ? 'sent' : 'none');
+    } catch {
+      setState('error');
+    }
+    setTimeout(() => setState('idle'), 6000);
+  }
+
+  const label = {
+    idle:    'Send a test notification',
+    sending: 'Sending…',
+    sent:    '✓ Sent — check your lock screen',
+    none:    'No device registered — re-enable above',
+    error:   'Failed — try again',
+  }[state];
+
+  return (
+    <button onClick={send} disabled={state === 'sending'} style={{
+      width: '100%', padding: '11px 0', borderRadius: 10, marginTop: 8,
+      border: `1px solid ${state === 'sent' ? '#16a34a' : '#e0e6ee'}`,
+      background: state === 'sent' ? '#dcfce7' : '#fff',
+      color: state === 'sent' ? '#16a34a' : state === 'none' || state === 'error' ? '#dc2626' : BRAND.navy,
+      fontSize: 13, fontWeight: 700, cursor: state === 'sending' ? 'default' : 'pointer',
+    }}>
+      {label}
+    </button>
+  );
+}
+
 // ── Main SettingsPage ─────────────────────────────────────────────────────────
 
 export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings, onClose, push }) {
@@ -784,8 +834,10 @@ export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings
                 );
               })}
             </Card>
+            <TestNotifButton teamId={teamId} userId={profile?.id} />
             <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
               Toggle channels on or off. You can also tap 🔔 in any channel header to quickly mute it.
+              You won't get notified for messages you send yourself — use the test button to verify your device.
             </p>
           </>
         )}
