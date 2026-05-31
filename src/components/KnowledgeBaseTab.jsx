@@ -35,12 +35,16 @@ function CategoryBadge({ categoryId, small = false }) {
 // ── Add Entry Sheet ───────────────────────────────────────────────────────────
 
 function AddEntrySheet({ onClose, onAdd }) {
-  const [step,     setStep]     = useState('choose');
-  const [title,    setTitle]    = useState('');
-  const [category, setCategory] = useState('tournament');
-  const [content,  setContent]  = useState('');
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState(null);
+  const [step,      setStep]      = useState('choose');
+  const [title,     setTitle]     = useState('');
+  const [category,  setCategory]  = useState('tournament');
+  const [content,   setContent]   = useState('');
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState(null);
+  // URL import state
+  const [urlInput,  setUrlInput]  = useState('');
+  const [fetching,  setFetching]  = useState(false);
+  const [sourceUrl, setSourceUrl] = useState(null);
 
   const cats = CATEGORIES.filter(c => c.id !== 'all');
 
@@ -48,12 +52,36 @@ function AddEntrySheet({ onClose, onAdd }) {
     if (!title.trim() || !content.trim()) return;
     setSaving(true);
     setError(null);
-    const result = await onAdd({ title: title.trim(), category, content: content.trim() });
+    const result = await onAdd({ title: title.trim(), category, content: content.trim(), sourceUrl });
     setSaving(false);
     if (result?.ok === false) {
       setError(result.error ?? 'Could not save entry. Try again.');
     } else {
       onClose();
+    }
+  };
+
+  const handleFetchUrl = async () => {
+    const url = urlInput.trim();
+    if (!url) return;
+    setFetching(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? 'Could not fetch URL'); return; }
+      if (!title.trim()) setTitle(data.title ?? '');
+      setContent(data.content ?? '');
+      setSourceUrl(data.url);
+      setStep('type'); // move to content editor for review/edit
+    } catch (err) {
+      setError('Network error — check your connection and try again.');
+    } finally {
+      setFetching(false);
     }
   };
 
@@ -116,6 +144,47 @@ function AddEntrySheet({ onClose, onAdd }) {
               <p style={{ fontSize: 11, color: '#aaa' }}>PDF or image</p>
             </button>
           </div>
+
+          <button onClick={() => { setError(null); setStep('url'); }} style={{
+            width: '100%', marginTop: 10, padding: '14px 12px', borderRadius: 14,
+            border: `1.5px solid ${BRAND.columbia}`, background: BRAND.columbiaLight,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{ fontSize: 22 }}>🌐</div>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: BRAND.navy, marginBottom: 1 }}>Import from URL</p>
+              <p style={{ fontSize: 11, color: BRAND.navyLight }}>Pull text from a web page — your team site, a flyer, a policy page</p>
+            </div>
+          </button>
+        </>)}
+
+        {/* ── Step: import from URL ── */}
+        {step === 'url' && (<>
+          <button onClick={() => { setError(null); setStep('choose'); }} style={{
+            background: 'none', border: 'none', fontSize: 13, color: BRAND.columbia,
+            cursor: 'pointer', padding: 0, marginBottom: 16, fontWeight: 600,
+          }}>← Back</button>
+          <p style={{ fontSize: 17, fontWeight: 700, color: BRAND.navy, marginBottom: 6 }}>Import from URL</p>
+          <p style={{ fontSize: 13, color: '#888', marginBottom: 16, lineHeight: 1.5 }}>
+            Paste a link and MatMind will pull the page's text so you can review and trim it before saving.
+            Works best on simple pages (not login-protected or heavily app-based sites).
+          </p>
+
+          <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>PAGE URL</p>
+          <input value={urlInput} onChange={e => setUrlInput(e.target.value)}
+            placeholder="https://your-team-site.com/tournaments"
+            onKeyDown={e => e.key === 'Enter' && !fetching && handleFetchUrl()}
+            style={{ ...inputStyle, marginBottom: 16 }} />
+
+          {error && <p style={{ color: '#EF4444', fontSize: 12, marginBottom: 12 }}>{error}</p>}
+
+          <button onClick={handleFetchUrl} disabled={fetching || !urlInput.trim()} style={{
+            width: '100%', padding: '14px 0', borderRadius: 12, border: 'none',
+            background: (!fetching && urlInput.trim()) ? BRAND.navy : '#ccd5de',
+            color: '#fff', fontSize: 15, fontWeight: 700, cursor: fetching ? 'default' : 'pointer',
+          }}>
+            {fetching ? 'Fetching…' : 'Fetch page content'}
+          </button>
         </>)}
 
         {/* ── Step: type content ── */}
@@ -124,8 +193,29 @@ function AddEntrySheet({ onClose, onAdd }) {
             background: 'none', border: 'none', fontSize: 13, color: BRAND.columbia,
             cursor: 'pointer', padding: 0, marginBottom: 16, fontWeight: 600,
           }}>← Back</button>
-          <p style={{ fontSize: 17, fontWeight: 700, color: BRAND.navy, marginBottom: 16 }}>Type or Paste Content</p>
+          <p style={{ fontSize: 17, fontWeight: 700, color: BRAND.navy, marginBottom: 16 }}>
+            {sourceUrl ? 'Review & Save' : 'Type or Paste Content'}
+          </p>
 
+          {sourceUrl && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12,
+              padding: '8px 12px', borderRadius: 8, background: BRAND.columbiaLight,
+              fontSize: 11, color: BRAND.navyLight,
+            }}>
+              <span>🌐</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Imported from {sourceUrl}
+              </span>
+            </div>
+          )}
+
+          <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>TITLE</p>
+          <input value={title} onChange={e => setTitle(e.target.value)}
+            placeholder="e.g. Wolfpack Takedown Hammer"
+            style={{ ...inputStyle, marginBottom: 14 }} />
+
+          <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>CONTENT</p>
           <textarea value={content} onChange={e => setContent(e.target.value)}
             placeholder="Paste tournament info, policy text, FAQ answers, or any notes here…"
             rows={10}
@@ -181,8 +271,30 @@ function AddEntrySheet({ onClose, onAdd }) {
 
 // ── Entry Detail ──────────────────────────────────────────────────────────────
 
-function EntryDetail({ entry, onClose, onDelete }) {
+function EntryDetail({ entry, onClose, onDelete, onUpdate }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [refreshState, setRefreshState] = useState('idle'); // idle | fetching | done | error
+
+  async function handleRefreshFromSource() {
+    if (!entry.sourceUrl || refreshState === 'fetching') return;
+    setRefreshState('fetching');
+    try {
+      const res = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: entry.sourceUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.content) { setRefreshState('error'); }
+      else {
+        const result = await onUpdate?.(entry.id, { content: data.content });
+        setRefreshState(result?.ok === false ? 'error' : 'done');
+      }
+    } catch {
+      setRefreshState('error');
+    }
+    setTimeout(() => setRefreshState('idle'), 4000);
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -232,7 +344,32 @@ function EntryDetail({ entry, onClose, onDelete }) {
             <span style={{ fontSize: 12 }}>🕐</span>
             <span style={{ fontSize: 12, color: '#888' }}>Added {entry.createdAt}</span>
           </div>
+          {entry.sourceUrl && (
+            <a href={entry.sourceUrl} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+              <span style={{ fontSize: 12 }}>🌐</span>
+              <span style={{ fontSize: 12, color: BRAND.columbia, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {entry.sourceUrl}
+              </span>
+            </a>
+          )}
         </div>
+
+        {/* Refresh from source — only for URL-imported entries */}
+        {entry.sourceUrl && onUpdate && (
+          <button onClick={handleRefreshFromSource} disabled={refreshState === 'fetching'} style={{
+            width: '100%', padding: '11px 0', borderRadius: 12, marginBottom: 10,
+            border: `1.5px solid ${refreshState === 'done' ? '#16a34a' : BRAND.columbia}`,
+            background: refreshState === 'done' ? '#dcfce7' : '#fff',
+            color: refreshState === 'done' ? '#16a34a' : refreshState === 'error' ? '#dc2626' : BRAND.navy,
+            fontSize: 13, fontWeight: 700, cursor: refreshState === 'fetching' ? 'default' : 'pointer',
+          }}>
+            {refreshState === 'fetching' ? 'Re-fetching…'
+              : refreshState === 'done'  ? '✓ Updated from source'
+              : refreshState === 'error' ? 'Could not refresh — try again'
+              : '🔄 Refresh from source'}
+          </button>
+        )}
 
         <button style={{
           width: '100%', padding: '13px 0', borderRadius: 12,
@@ -308,7 +445,7 @@ function EntryCard({ entry, onClick }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 // Props come from MainApp via useKnowledgeBase hook — no local mock data.
 
-export default function KnowledgeBaseTab({ entries = [], loading = false, onAdd, onDelete, isCoach = true }) {
+export default function KnowledgeBaseTab({ entries = [], loading = false, onAdd, onUpdate, onDelete, isCoach = true }) {
   const [activeFilter, setFilter]    = useState('all');
   const [selectedEntry, setSelected] = useState(null);
   const [showAdd, setShowAdd]        = useState(false);
@@ -318,11 +455,15 @@ export default function KnowledgeBaseTab({ entries = [], loading = false, onAdd,
     : entries.filter(e => e.category === activeFilter);
 
   if (selectedEntry) {
+    // Render from the live entries array so edits (e.g. refresh-from-source)
+    // appear immediately instead of showing the stale selected snapshot.
+    const liveEntry = entries.find(e => e.id === selectedEntry.id) || selectedEntry;
     return (
       <EntryDetail
-        entry={selectedEntry}
+        entry={liveEntry}
         onClose={() => setSelected(null)}
         onDelete={(id) => { onDelete(id); setSelected(null); }}
+        onUpdate={onUpdate}
       />
     );
   }

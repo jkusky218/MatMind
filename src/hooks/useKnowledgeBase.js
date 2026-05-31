@@ -89,7 +89,8 @@ function normalizeEntry(row) {
     title:     row.title,
     category:  row.category,
     content:   row.content,
-    fileName:  row.file_name ?? null,
+    fileName:  row.file_name  ?? null,
+    sourceUrl: row.source_url ?? null,
     createdAt,
   };
 }
@@ -120,7 +121,7 @@ export function useKnowledgeBase(auth) {
     setLoading(true);
     const { data, error } = await supabase
       .from('knowledge_base')
-      .select('id, title, category, content, file_name, created_at')
+      .select('id, title, category, content, file_name, source_url, created_at')
       .eq('team_id', teamId)
       .order('created_at', { ascending: false });
 
@@ -130,10 +131,10 @@ export function useKnowledgeBase(auth) {
   }
 
   // ── Add ───────────────────────────────────────────────────────────────────
-  const addEntry = useCallback(async ({ title, category, content, fileName = null }) => {
+  const addEntry = useCallback(async ({ title, category, content, fileName = null, sourceUrl = null }) => {
     // Optimistic update
     const tempId = `temp-${Date.now()}`;
-    const optimistic = { id: tempId, title, category, content, fileName, createdAt: 'Just now' };
+    const optimistic = { id: tempId, title, category, content, fileName, sourceUrl, createdAt: 'Just now' };
     setEntries(prev => [optimistic, ...prev]);
 
     if (isDemo || !supabase) return { ok: true };
@@ -145,10 +146,11 @@ export function useKnowledgeBase(auth) {
         title,
         category,
         content,
-        file_name:  fileName ?? null,
+        file_name:  fileName  ?? null,
+        source_url: sourceUrl ?? null,
         created_by: auth?.user?.id ?? null,
       })
-      .select('id, title, category, content, file_name, created_at')
+      .select('id, title, category, content, file_name, source_url, created_at')
       .single();
 
     if (error) {
@@ -161,6 +163,22 @@ export function useKnowledgeBase(auth) {
     setEntries(prev => prev.map(e => e.id === tempId ? normalizeEntry(data) : e));
     return { ok: true };
   }, [auth, teamId]);
+
+  // ── Update ────────────────────────────────────────────────────────────────
+  const updateEntry = useCallback(async (id, { content }) => {
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, content } : e));
+    if (isDemo || !supabase) return { ok: true };
+    const { error } = await supabase
+      .from('knowledge_base')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      console.error('MatMind: KB update failed', error.message);
+      load();
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  }, [teamId]);
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const deleteEntry = useCallback(async (id) => {
@@ -182,5 +200,5 @@ export function useKnowledgeBase(auth) {
     return { ok: true };
   }, [teamId]);
 
-  return { entries, loading, addEntry, deleteEntry };
+  return { entries, loading, addEntry, updateEntry, deleteEntry };
 }
