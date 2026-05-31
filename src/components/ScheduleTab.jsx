@@ -226,9 +226,72 @@ function AttendanceSection({ event, attendance, recordAttendance, athletes }) {
   );
 }
 
+// ── Parent RSVP section ──────────────────────────────────────────────────────
+
+function ParentRsvpSection({ event, availability, updateAvailabilityEntry, myAthletes }) {
+  if (!myAthletes.length) return (
+    <p style={{ fontSize: 12, color: '#bbb', textAlign: 'center', padding: '8px 0' }}>
+      No athletes linked to your account yet.
+    </p>
+  );
+
+  return (
+    <>
+      <p style={{ fontSize: 12, fontWeight: 600, color: '#555', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+        Your RSVP
+      </p>
+      {myAthletes.map(athlete => {
+        const status = availability[`${athlete.id}-${event.id}`]; // 'confirmed' | 'declined' | undefined
+        const groupColor = GROUP_COLORS[athlete.group] ?? BRAND.navy;
+        return (
+          <div key={athlete.id} style={{ marginBottom: 10 }}>
+            {myAthletes.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                  background: groupColor + '22', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: 9, fontWeight: 700, color: groupColor,
+                }}>
+                  {athlete.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>{athlete.name}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => updateAvailabilityEntry(athlete.id, event.id, status === 'confirmed' ? 'pending' : 'confirmed')}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 700, transition: 'background 0.15s, color 0.15s',
+                  background: status === 'confirmed' ? '#22C55E' : '#f0f4f8',
+                  color:      status === 'confirmed' ? '#fff'    : '#555',
+                }}
+              >
+                ✓ Going
+              </button>
+              <button
+                onClick={() => updateAvailabilityEntry(athlete.id, event.id, status === 'declined' ? 'pending' : 'declined')}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 700, transition: 'background 0.15s, color 0.15s',
+                  background: status === 'declined' ? '#EF4444' : '#f0f4f8',
+                  color:      status === 'declined' ? '#fff'    : '#555',
+                }}
+              >
+                ✗ Can't make it
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 // ── Event card ───────────────────────────────────────────────────────────────
 
-function EventCard({ ev, availability, attendance, recordAttendance, athletes, isCoach }) {
+function EventCard({ ev, availability, attendance, recordAttendance, athletes, isCoach, userRole, myAthletes, updateAvailabilityEntry }) {
+  const isParent = userRole === 'parent';
   const [expanded, setExpanded] = useState(false);
   const ts = TYPE_STYLE[ev.type] ?? TYPE_STYLE.practice;
   const d  = formatDate(ev.date);
@@ -277,7 +340,16 @@ function EventCard({ ev, availability, attendance, recordAttendance, athletes, i
           onClick={e => e.stopPropagation()}
           style={{ padding: '12px 14px 14px', borderTop: '1px solid #f0f0f0' }}
         >
-          <AvailabilitySection event={ev} availability={availability} athletes={athletes} />
+          {isParent ? (
+            <ParentRsvpSection
+              event={ev}
+              availability={availability}
+              updateAvailabilityEntry={updateAvailabilityEntry}
+              myAthletes={myAthletes}
+            />
+          ) : (
+            <AvailabilitySection event={ev} availability={availability} athletes={athletes} />
+          )}
 
           {isCoach && (
             <AttendanceSection
@@ -295,7 +367,7 @@ function EventCard({ ev, availability, attendance, recordAttendance, athletes, i
 
 // ── ScheduleTab ──────────────────────────────────────────────────────────────
 
-export default function ScheduleTab({ events, availability, attendance = {}, recordAttendance, roster, isCoach = false }) {
+export default function ScheduleTab({ events, availability, attendance = {}, recordAttendance, roster, isCoach = false, userRole = 'coach', myAthletes = [], updateAvailabilityEntry }) {
   const athletes = roster.filter(r => r.group !== 'coaches');
   const [typeFilter,  setTypeFilter]  = useState('all');
   const [groupFilter, setGroupFilter] = useState('all');
@@ -371,6 +443,9 @@ export default function ScheduleTab({ events, availability, attendance = {}, rec
             recordAttendance={recordAttendance ?? (() => {})}
             athletes={athletes}
             isCoach={isCoach}
+            userRole={userRole}
+            myAthletes={myAthletes}
+            updateAvailabilityEntry={updateAvailabilityEntry ?? (() => {})}
           />
         ))}
       </div>

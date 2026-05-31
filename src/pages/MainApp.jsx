@@ -156,8 +156,14 @@ export default function MainApp({ auth }) {
   const push = usePushNotifications(auth);
   const [notifyOpen, setNotifyOpen] = useState(false);
 
-  const isCoach = auth.profile?.role === 'coach' || auth.profile?.role === 'admin' || !auth.profile;
-  const isAdmin = auth.profile?.role === 'admin';
+  const userRole = auth.profile?.role ?? 'coach';
+  const isCoach  = userRole === 'coach' || userRole === 'admin' || !auth.profile;
+  const isAdmin  = userRole === 'admin';
+
+  // Athletes linked to the current parent account (empty for coaches/admins)
+  const myAthletes = userRole === 'parent'
+    ? (parents.find(p => p.id === auth.profile?.id)?.athletes ?? [])
+    : [];
 
   const { settings: teamSettings, updateSettings } = useTeamSettings(auth);
 
@@ -329,6 +335,7 @@ export default function MainApp({ auth }) {
                 <ChannelList
                   onSelect={setActiveChannel}
                   channelMessages={channelMessages}
+                  userRole={userRole}
                 />
               </div>
             )}
@@ -340,6 +347,9 @@ export default function MainApp({ auth }) {
                 recordAttendance={recordAttendance}
                 roster={roster}
                 isCoach={isCoach}
+                userRole={userRole}
+                myAthletes={myAthletes}
+                updateAvailabilityEntry={updateAvailabilityEntry}
               />
             )}
             {tab === 'roster' && (

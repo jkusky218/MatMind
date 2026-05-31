@@ -1,7 +1,9 @@
 import { BRAND, CHANNELS } from '../lib/constants';
 import { Brain, Lock, ICON_MAP } from './Icons';
 
-export default function ChannelList({ onSelect, channelMessages }) {
+export default function ChannelList({ onSelect, channelMessages, userRole = 'coach' }) {
+  const isParent = userRole === 'parent';
+
   const getLastMessage = (slug) => {
     const msgs = channelMessages[slug] ?? [];
     return msgs.length > 0 ? msgs[msgs.length - 1] : null;
@@ -13,15 +15,19 @@ export default function ChannelList({ onSelect, channelMessages }) {
     return msgs.some(m => m.role === 'parent') ? 1 : 0;
   };
 
+  // Parents don't see the private AI channel
+  const publicChannels = CHANNELS.filter(ch => ch.id !== 'ai');
+  const visibleCount   = isParent ? publicChannels.length : CHANNELS.length;
+
   return (
     <div style={{ padding: '16px 12px', overflowY: 'auto', height: '100%' }}>
       <div style={{ marginBottom: 16 }}>
         <p style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#1a1a1a' }}>Messages</p>
-        <p style={{ fontSize: 12, color: '#888', margin: '2px 0 0' }}>{CHANNELS.length} channels</p>
+        <p style={{ fontSize: 12, color: '#888', margin: '2px 0 0' }}>{visibleCount} channels</p>
       </div>
 
-      {/* AI channel — featured card */}
-      <div style={{ marginBottom: 16 }}>
+      {/* AI channel — coaches only, featured card */}
+      {!isParent && <div style={{ marginBottom: 16 }}>
         <button onClick={() => onSelect(CHANNELS[0])} style={{
           width: '100%', textAlign: 'left', cursor: 'pointer',
           border: `1px solid ${BRAND.columbia}30`, borderRadius: 14, padding: '14px 16px',
@@ -43,14 +49,14 @@ export default function ChannelList({ onSelect, channelMessages }) {
             Private
           </div>
         </button>
-      </div>
+      </div>}
 
       <p style={{ fontSize: 11, fontWeight: 600, color: '#999', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 10px 4px' }}>
         Team channels
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {CHANNELS.slice(1).map(ch => {
+        {publicChannels.map(ch => {
           const ChIcon  = ICON_MAP[ch.icon] ?? ICON_MAP.hash;
           const last    = getLastMessage(ch.id);
           const unread  = getUnreadCount(ch.id);
