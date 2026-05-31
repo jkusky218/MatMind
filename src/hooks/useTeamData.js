@@ -141,7 +141,114 @@ export function useTeamData(auth) {
     setLoading(false);
   }, []);
 
-  // ── Supabase mode ───────────────────────────────────────────────────────────
+  // ── Data loader (re-runnable for pull-to-refresh) ───────────────────────────
+  // Fetches all team data and applies it to state. Does NOT touch `loading`
+  // (the initial-load effect manages that) so a refresh won't blank the screen.
+  const loadData = useCallback(async () => {
+    if (isDemo || !supabase || !teamId) return;
+
+    // Athletes
+    const { data: athleteRows } = await supabase
+      .from('athletes')
+      .select(`
+        id, first_name, last_name, weight, grade, school, roster_group,
+        athlete_parents(is_primary, profiles(full_name, email, phone))
+      `)
+      .eq('team_id', teamId)
+      .eq('active', true)
+      .order('weight', { ascending: true });
+
+    // Coaches
+    const { data: coachRows } = await supabase
+      .from('coaches')
+      .select(`id, title, roster_group, profiles(full_name, email, phone)`)
+      .eq('team_id', teamId)
+      .eq('active', true);
+
+    setRoster([
+      ...(coachRows ?? []).map(normalizeCoach),
+      ...(athleteRows ?? []).map(normalizeAthlete),
+    ]);
+
+    // Parents
+    const { data: parentRows } = await supabase
+      .from('profiles')
+      .select(`
+        id, full_name, email, phone,
+        athlete_parents!parent_id(
+          athletes(id, first_name, last_name, roster_group)
+        )
+      `)
+      .eq('team_id', teamId)
+      .eq('role', 'parent');
+    setParents((parentRows ?? []).map(normalizeParent));
+
+    // Events
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: eventRows } = await supabase
+      .from('events')
+      .select('id, title, event_type, event_date, start_time, location_name, roster_group, roster_groups')
+      .eq('team_id', teamId)
+      .gte('event_date', today)
+      .order('event_date', { ascending: true })
+      .limit(20);
+
+    const normalizedEvents = (eventRows ?? []).map(normalizeEvent);
+    setEvents(normalizedEvents);
+
+    // Availability + Attendance (fetched together for the same event IDs)
+    if (normalizedEvents.length > 0) {
+      const eventIds = normalizedEvents.map(e => e.id);
+      const [{ data: availRows }, { data: attendRows }] = await Promise.all([
+        supabase.from('availability').select('event_id, athlete_id, status').in('event_id', eventIds),
+        supabase.from('attendance').select('event_id, athlete_id, status').in('event_id', eventIds),
+      ]);
+      const availMap = {};
+      (availRows ?? []).forEach(row => { availMap[`${row.athlete_id}-${row.event_id}`] = row.status; });
+      setAvailability(availMap);
+      const attendMap = {};
+      (attendRows ?? []).forEach(row => { attendMap[`${row.athlete_id}-${row.event_id}`] = row.status; });
+      setAttendance(attendMap);
+    }
+
+    // Channels + messages
+    const { data: channelRows } = await supabase
+      .from('channels')
+      .select('id, name, channel_type, roster_group, is_private')
+      .eq('team_id', teamId);
+
+    const sToId = {};
+    const iToS = {};
+    (channelRows ?? []).forEach(ch => {
+      const slug = CHANNEL_NAME_TO_SLUG[ch.name];
+      if (slug) { sToId[slug] = ch.id; iToS[ch.id] = slug; }
+    });
+    slugToId.current = sToId;
+    idToSlug.current = iToS;
+
+    const channelUUIDs = Object.values(sToId);
+    if (channelUUIDs.length > 0) {
+      const { data: msgRows } = await supabase
+        .from('messages')
+        .select('id, channel_id, sender_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, edited_at, created_at')
+        .in('channel_id', channelUUIDs)
+        .order('created_at', { ascending: true });
+
+      const grouped = { ai: [] };
+      (msgRows ?? []).forEach(m => {
+        const slug = iToS[m.channel_id];
+        if (slug) {
+          if (!grouped[slug]) grouped[slug] = [];
+          grouped[slug].push(normalizeMessage(m));
+        }
+      });
+      setChannelMessages(grouped);
+    } else {
+      setChannelMessages({ ai: [] });
+    }
+  }, [teamId]);
+
+  // ── Supabase mode: initial load + realtime subscription ─────────────────────
   useEffect(() => {
     if (isDemo || !supabase) return;
     if (!teamId) {
@@ -152,135 +259,13 @@ export function useTeamData(auth) {
 
     let realtimeChannel;
 
-    async function load() {
+    (async () => {
       setLoading(true);
-      try {
+      try { await loadData(); }
+      catch (err) { console.error('MatMind: failed to load team data', err); }
+      finally { setLoading(false); }
 
-      // Athletes
-      const { data: athleteRows } = await supabase
-        .from('athletes')
-        .select(`
-          id, first_name, last_name, weight, grade, school, roster_group,
-          athlete_parents(is_primary, profiles(full_name, email, phone))
-        `)
-        .eq('team_id', teamId)
-        .eq('active', true)
-        .order('weight', { ascending: true });
-
-      // Coaches
-      const { data: coachRows } = await supabase
-        .from('coaches')
-        .select(`id, title, roster_group, profiles(full_name, email, phone)`)
-        .eq('team_id', teamId)
-        .eq('active', true);
-
-      const normalizedRoster = [
-        ...(coachRows ?? []).map(normalizeCoach),
-        ...(athleteRows ?? []).map(normalizeAthlete),
-      ];
-      setRoster(normalizedRoster);
-
-      // Parents
-      const { data: parentRows } = await supabase
-        .from('profiles')
-        .select(`
-          id, full_name, email, phone,
-          athlete_parents!parent_id(
-            athletes(id, first_name, last_name, roster_group)
-          )
-        `)
-        .eq('team_id', teamId)
-        .eq('role', 'parent');
-      setParents((parentRows ?? []).map(normalizeParent));
-
-      // Events
-      const today = new Date().toISOString().slice(0, 10);
-      const { data: eventRows } = await supabase
-        .from('events')
-        .select('id, title, event_type, event_date, start_time, location_name, roster_group, roster_groups')
-        .eq('team_id', teamId)
-        .gte('event_date', today)
-        .order('event_date', { ascending: true })
-        .limit(20);
-
-      const normalizedEvents = (eventRows ?? []).map(normalizeEvent);
-      setEvents(normalizedEvents);
-
-      // Availability + Attendance (fetched together for the same event IDs)
-      if (normalizedEvents.length > 0) {
-        const eventIds = normalizedEvents.map(e => e.id);
-
-        const [{ data: availRows }, { data: attendRows }] = await Promise.all([
-          supabase
-            .from('availability')
-            .select('event_id, athlete_id, status')
-            .in('event_id', eventIds),
-          supabase
-            .from('attendance')
-            .select('event_id, athlete_id, status')
-            .in('event_id', eventIds),
-        ]);
-
-        const availMap = {};
-        (availRows ?? []).forEach(row => {
-          availMap[`${row.athlete_id}-${row.event_id}`] = row.status;
-        });
-        setAvailability(availMap);
-
-        const attendMap = {};
-        (attendRows ?? []).forEach(row => {
-          attendMap[`${row.athlete_id}-${row.event_id}`] = row.status;
-        });
-        setAttendance(attendMap);
-      }
-
-      // Channels + messages
-      const { data: channelRows } = await supabase
-        .from('channels')
-        .select('id, name, channel_type, roster_group, is_private')
-        .eq('team_id', teamId);
-
-      const sToId = {};
-      const iToS = {};
-      (channelRows ?? []).forEach(ch => {
-        const slug = CHANNEL_NAME_TO_SLUG[ch.name];
-        if (slug) {
-          sToId[slug] = ch.id;
-          iToS[ch.id] = slug;
-        }
-      });
-      slugToId.current = sToId;
-      idToSlug.current = iToS;
-
-      // Fetch messages for all known channels
-      const channelUUIDs = Object.values(sToId);
-      if (channelUUIDs.length > 0) {
-        const { data: msgRows } = await supabase
-          .from('messages')
-          .select('id, channel_id, sender_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, edited_at, created_at')
-          .in('channel_id', channelUUIDs)
-          .order('created_at', { ascending: true });
-
-        const grouped = { ai: [] };
-        (msgRows ?? []).forEach(m => {
-          const slug = iToS[m.channel_id];
-          if (slug) {
-            if (!grouped[slug]) grouped[slug] = [];
-            grouped[slug].push(normalizeMessage(m));
-          }
-        });
-        setChannelMessages(grouped);
-      } else {
-        setChannelMessages({ ai: [] });
-      }
-
-      } catch (err) {
-        console.error('MatMind: failed to load team data', err);
-      } finally {
-        setLoading(false);
-      }
-
-      // Realtime subscription for new messages
+      // Realtime subscription for message changes
       realtimeChannel = supabase
         .channel('matmind-messages')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
@@ -314,11 +299,17 @@ export function useTeamData(auth) {
           });
         })
         .subscribe();
-    }
+    })();
 
-    load();
     return () => { realtimeChannel?.unsubscribe(); };
-  }, [teamId]);
+  }, [teamId, loadData]);
+
+  // ── refresh: re-fetch all data in place (pull-to-refresh) ───────────────────
+  const refresh = useCallback(async () => {
+    if (isDemo || !supabase || !teamId) return;
+    try { await loadData(); }
+    catch (err) { console.error('MatMind: refresh failed', err); }
+  }, [loadData, teamId]);
 
   // ── createEvent ─────────────────────────────────────────────────────────────
   const createEvent = useCallback(async ({ title, type = 'practice', date, time, location = '', groups = null }) => {
@@ -595,6 +586,7 @@ export function useTeamData(auth) {
     deleteMessage,
     createEvent,
     updateAvailabilityEntry,
+    refresh,
     loading,
     isDemo,
   };

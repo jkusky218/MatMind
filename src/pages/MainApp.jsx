@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { BRAND } from '../lib/constants';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { Brain, Chat, Calendar, Users, UserIcon, BookOpen, Settings } from '../components/Icons';
 import SettingsPage from '../components/SettingsPage';
 import { useTeamData } from '../hooks/useTeamData';
@@ -36,6 +37,7 @@ export default function MainApp({ auth }) {
     attendance, recordAttendance,
     channelMessages, sendMessage, sendAIMessage, editMessage, deleteMessage,
     createEvent, updateAvailabilityEntry,
+    refresh,
     loading, isDemo,
   } = useTeamData(auth);
 
@@ -43,6 +45,7 @@ export default function MainApp({ auth }) {
     entries: kbEntries,
     loading: kbLoading,
     addEntry: addKbEntry,
+    updateEntry: updateKbEntry,
     deleteEntry: deleteKbEntry,
   } = useKnowledgeBase(auth);
 
@@ -65,6 +68,10 @@ export default function MainApp({ auth }) {
       .map(g => g.id),
   ];
   const push = usePushNotifications(auth, defaultPushChannels);
+
+  // Pull-to-refresh: re-fetches team data in place (no full page reload).
+  // containerRef is a callback ref so listeners attach when the content mounts.
+  const { containerRef, pull, progress, refreshing, threshold } = usePullToRefresh(refresh);
 
   function handleMemberAdded({ type, data }) {
     if (type === 'coach' && data) {
@@ -115,6 +122,7 @@ export default function MainApp({ auth }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+        @keyframes ptr-spin { to { transform: rotate(360deg); } }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 0; }
         input:focus { outline: none; }
@@ -188,7 +196,32 @@ export default function MainApp({ auth }) {
       />
 
       {/* ── Content ── */}
-      <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)', position: 'relative' }}>
+      <div ref={containerRef} style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)', position: 'relative' }}>
+
+        {/* Pull-to-refresh spinner — slides down while pulling, spins while refreshing */}
+        {(pull > 0 || refreshing) && !activeChannel && !settingsOpen && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 40,
+            display: 'flex', justifyContent: 'center',
+            transform: `translateY(${(refreshing ? threshold : pull) - 34}px)`,
+            transition: refreshing || pull === 0 ? 'transform 0.25s ease' : 'none',
+            pointerEvents: 'none',
+          }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%', background: '#fff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <div style={{
+                width: 18, height: 18, borderRadius: '50%',
+                border: '2.5px solid #e2e8f0', borderTopColor: BRAND.navy,
+                transform: refreshing ? undefined : `rotate(${progress * 270}deg)`,
+                animation: refreshing ? 'ptr-spin 0.7s linear infinite' : 'none',
+              }} />
+            </div>
+          </div>
+        )}
+
         {settingsOpen ? (
           <SettingsPage auth={auth} teamSettings={teamSettings} onUpdateSettings={updateSettings} onClose={() => setSettingsOpen(false)} push={push} />
         ) : activeChannel ? (
@@ -250,6 +283,7 @@ export default function MainApp({ auth }) {
                 entries={kbEntries}
                 loading={kbLoading}
                 onAdd={addKbEntry}
+                onUpdate={updateKbEntry}
                 onDelete={deleteKbEntry}
                 isCoach={isCoach}
               />

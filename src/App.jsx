@@ -1,58 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useTeamResolver } from './hooks/useTeamResolver';
 import LoginScreen from './pages/LoginScreen';
 import MainApp from './pages/MainApp';
 import SetPasswordPage from './pages/SetPasswordPage';
-
-// ── Pull-to-refresh ───────────────────────────────────────────────────────────
-// In standalone / home-screen mode there's no browser refresh button.
-// Pulling down from the top of the screen (≥ 90px) triggers a full reload.
-// A small indicator pill animates in to give visual feedback.
-
-function usePullToRefresh() {
-  const [pullY,    setPullY]    = useState(0);   // px pulled (0 = none)
-  const [released, setReleased] = useState(false);
-  const startYRef = useRef(0);
-  const THRESHOLD = 90;
-
-  useEffect(() => {
-    const onStart = (e) => {
-      startYRef.current = e.touches[0].pageY;
-      setReleased(false);
-    };
-
-    const onMove = (e) => {
-      const dy = e.touches[0].pageY - startYRef.current;
-      // Only activate when pulling DOWN from the very top (window not scrolled)
-      if (dy > 0 && window.scrollY === 0) {
-        setPullY(Math.min(dy, THRESHOLD + 20));
-      } else {
-        setPullY(0);
-      }
-    };
-
-    const onEnd = () => {
-      if (pullY >= THRESHOLD) {
-        setReleased(true);
-        setTimeout(() => window.location.reload(), 200);
-      } else {
-        setPullY(0);
-      }
-    };
-
-    document.addEventListener('touchstart', onStart, { passive: true });
-    document.addEventListener('touchmove',  onMove,  { passive: true });
-    document.addEventListener('touchend',   onEnd);
-    return () => {
-      document.removeEventListener('touchstart', onStart);
-      document.removeEventListener('touchmove',  onMove);
-      document.removeEventListener('touchend',   onEnd);
-    };
-  }, [pullY]);
-
-  return { pullY, released, threshold: THRESHOLD };
-}
 
 // Read the URL hash ONCE at module load — Supabase clears it after processing,
 // so we capture it here before any effects run.
@@ -63,7 +14,6 @@ const _authType = _params.get('type'); // 'invite' | 'recovery' | null
 export default function App() {
   const auth = useAuth();
   const { teamBranding, loading: brandingLoading, notFound } = useTeamResolver();
-  const { pullY, released, threshold } = usePullToRefresh();
   const [updateReady, setUpdateReady] = useState(false);
 
   useEffect(() => {
@@ -82,9 +32,6 @@ export default function App() {
     if (auth.profile.team_id === teamBranding.teamId) return;
     auth.switchTeam(teamBranding.teamId);
   }, [auth.isSuperAdmin, teamBranding?.teamId, auth.profile?.team_id]);
-
-  const pullProgress  = Math.min(pullY / threshold, 1);
-  const showIndicator = pullY > 12;
 
   // Track whether this page load came from an invite or password-reset link.
   // We derive it only once from the captured hash; onComplete clears it.
@@ -194,33 +141,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Pull-to-refresh indicator — floats above the app, visible only while pulling */}
-      {showIndicator && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-          display: 'flex', justifyContent: 'center',
-          transform: `translateY(${Math.max(pullY - 10, 0)}px)`,
-          transition: released ? 'transform 0.2s' : 'none',
-          pointerEvents: 'none',
-        }}>
-          <div style={{
-            background: '#1B3A5C', color: '#fff',
-            borderRadius: 20, padding: '5px 14px',
-            fontSize: 12, fontWeight: 600,
-            display: 'flex', alignItems: 'center', gap: 6,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.25)',
-            opacity: Math.min(pullProgress * 2, 1),
-          }}>
-            <span style={{
-              display: 'inline-block',
-              transform: `rotate(${pullProgress * 180}deg)`,
-              transition: 'transform 0.1s',
-              fontSize: 14,
-            }}>↓</span>
-            {pullProgress >= 1 ? 'Release to refresh' : 'Pull to refresh'}
-          </div>
-        </div>
-      )}
       <MainApp auth={resolvedAuth} />
     </>
   );
