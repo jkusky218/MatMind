@@ -15,9 +15,9 @@ export default function ChannelList({ onSelect, channelMessages, userRole = 'coa
     return msgs.some(m => m.role === 'parent') ? 1 : 0;
   };
 
-  // Parents don't see the private AI channel
+  // All roles see all channels — parents just get Q&A-only AI (no tools on the backend)
   const publicChannels = CHANNELS.filter(ch => ch.id !== 'ai');
-  const visibleCount   = isParent ? publicChannels.length : CHANNELS.length;
+  const visibleCount   = CHANNELS.length;
 
   return (
     <div style={{ padding: '16px 12px', overflowY: 'auto', height: '100%' }}>
@@ -26,8 +26,8 @@ export default function ChannelList({ onSelect, channelMessages, userRole = 'coa
         <p style={{ fontSize: 12, color: '#888', margin: '2px 0 0' }}>{visibleCount} channels</p>
       </div>
 
-      {/* AI channel — coaches only, featured card */}
-      {!isParent && <div style={{ marginBottom: 16 }}>
+      {/* AI channel — featured card (coaches see "Private", parents see Q&A version) */}
+      <div style={{ marginBottom: 16 }}>
         <button onClick={() => onSelect(CHANNELS[0])} style={{
           width: '100%', textAlign: 'left', cursor: 'pointer',
           border: `1px solid ${BRAND.columbia}30`, borderRadius: 14, padding: '14px 16px',
@@ -43,13 +43,17 @@ export default function ChannelList({ onSelect, channelMessages, userRole = 'coa
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', margin: 0 }}>MatMind AI</p>
-            <p style={{ fontSize: 12, color: BRAND.columbiaMid, margin: '2px 0 0' }}>Ask me anything about the team</p>
+            <p style={{ fontSize: 12, color: BRAND.columbiaMid, margin: '2px 0 0' }}>
+              {isParent ? 'Ask questions about the team' : 'Ask me anything about the team'}
+            </p>
           </div>
-          <div style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(107,173,228,0.15)', fontSize: 10, fontWeight: 600, color: BRAND.columbia }}>
-            Private
-          </div>
+          {!isParent && (
+            <div style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(107,173,228,0.15)', fontSize: 10, fontWeight: 600, color: BRAND.columbia }}>
+              Private
+            </div>
+          )}
         </button>
-      </div>}
+      </div>
 
       <p style={{ fontSize: 11, fontWeight: 600, color: '#999', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 10px 4px' }}>
         Team channels

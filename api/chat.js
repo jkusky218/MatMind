@@ -26,11 +26,16 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-2024-07-31',
       },
+      const isCoach = userRole === 'coach' || userRole === 'admin';
+
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
-        tools: [buildScheduleTool(teamName), buildPostMessageTool()],
-        tool_choice: { type: 'auto' },
+        // Only give coaches the schedule/posting tools — parents get Q&A only
+        ...(isCoach ? {
+          tools: [buildScheduleTool(teamName), buildPostMessageTool()],
+          tool_choice: { type: 'auto' },
+        } : {}),
         system: [
           {
             type: 'text',
