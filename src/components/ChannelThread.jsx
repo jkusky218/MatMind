@@ -6,19 +6,29 @@ import { sendToMatMind } from '../lib/ai';
 import { uploadChannelFile } from '../lib/storage';
 import { isDemo } from '../lib/supabase';
 
-// ── Question detection ────────────────────────────────────────────────────────
-// Determines whether a channel message looks like something the AI should
-// answer. Matches explicit question marks and common question-starter phrases.
+// ── AI trigger detection ──────────────────────────────────────────────────────
+// Returns true when a channel message should get an AI response.
+// Two modes:
+//   1. Explicit: message starts with @matmind or @ai — always triggers
+//   2. Automatic: message looks like a question (? or question-starter words)
 
-function looksLikeQuestion(text) {
+function shouldTriggerAI(text) {
   const t = text.toLowerCase().trim();
-  if (!t || t.length < 8) return false;
+  if (!t || t.length < 4) return false;
+
+  // Explicit mention — always triggers regardless of phrasing
+  if (t.startsWith('@matmind') || t.startsWith('@ai ') || t === '@ai') return true;
+
+  // Automatic: question mark anywhere in the message
   if (t.includes('?')) return true;
+
+  // Automatic: starts with or contains a question-starter word/phrase
   const starters = [
     'when ', 'where ', 'what ', 'who ', 'how ', 'why ',
     'is ', 'are ', 'was ', 'were ', 'does ', 'do ', 'did ',
     'can ', 'will ', 'should ', 'could ', 'would ',
     'anyone know', 'does anyone', 'do we ', 'do you ',
+    'any idea', 'any info', 'remind me', 'tell me',
   ];
   return starters.some(s => t.startsWith(s) || t.includes(` ${s}`));
 }
@@ -409,13 +419,15 @@ export default function ChannelThread({
     } else {
       onSendMessage(channel.id, text, attachments);
 
-      // If the message looks like a question and we have an AI responder,
+      // If the message looks like a question (or starts with @MatMind),
       // ask Claude and post the answer back to the channel.
-      if (!attachments && looksLikeQuestion(text) && onSendAIMessage) {
+      if (!attachments && shouldTriggerAI(text) && onSendAIMessage) {
+        // Strip the @mention prefix before sending to the AI
+        const aiQuery = text.replace(/^@matmind\s*/i, '').replace(/^@ai\s*/i, '').trim() || text;
         setChannelAITyping(true);
         try {
           const resp = await sendToMatMind(
-            text,
+            aiQuery,
             {
               roster,
               events,
@@ -602,7 +614,7 @@ export default function ChannelThread({
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
           disabled={typing}
-          placeholder={isAI ? 'Tell MatMind what you need...' : `Message #${channel.label}...`}
+          placeholder={isAI ? 'Tell MatMind what you need...' : `Message #${channel.label}… (or @MatMind to ask AI)`}
           style={{ flex: 1, background: '#f0f4f8', border: 'none', borderRadius: 20, padding: '10px 16px', fontSize: 14, outline: 'none', color: '#1a1a1a', opacity: typing ? 0.6 : 1 }}
         />
         <button
