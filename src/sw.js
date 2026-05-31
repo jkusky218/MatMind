@@ -10,6 +10,23 @@ import { ExpirationPlugin } from 'workbox-expiration';
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
+// ── Automatic updates ─────────────────────────────────────────────────────────
+// vite-plugin-pwa (autoUpdate mode) posts SKIP_WAITING when a new SW is ready.
+// We call skipWaiting() so the new SW activates immediately instead of waiting
+// for all tabs to close — critical for home-screen / standalone PWA installs.
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Claim all open clients immediately so the controllerchange event fires
+// in the app and it can reload to pick up the new precached assets.
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
 // Cache Google Fonts
 registerRoute(
   ({ url }) => url.origin === 'https://fonts.googleapis.com',
