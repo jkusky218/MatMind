@@ -6,6 +6,23 @@ import { sendToMatMind } from '../lib/ai';
 import { uploadChannelFile } from '../lib/storage';
 import { isDemo } from '../lib/supabase';
 
+// ── Question detection ────────────────────────────────────────────────────────
+// Determines whether a channel message looks like something the AI should
+// answer. Matches explicit question marks and common question-starter phrases.
+
+function looksLikeQuestion(text) {
+  const t = text.toLowerCase().trim();
+  if (!t || t.length < 8) return false;
+  if (t.includes('?')) return true;
+  const starters = [
+    'when ', 'where ', 'what ', 'who ', 'how ', 'why ',
+    'is ', 'are ', 'was ', 'were ', 'does ', 'do ', 'did ',
+    'can ', 'will ', 'should ', 'could ', 'would ',
+    'anyone know', 'does anyone', 'do we ', 'do you ',
+  ];
+  return starters.some(s => t.startsWith(s) || t.includes(` ${s}`));
+}
+
 // ── Claude intent execution ───────────────────────────────────────────────────
 // After Claude responds, it may include a structured intents array.
 // We execute those here so the actual data mutations match what Claude describes.
@@ -256,6 +273,7 @@ export default function ChannelThread({
   messages,
   onBack,
   onSendMessage,
+  onSendAIMessage,
   roster, events, availability, attendance, kbEntries,
   setRoster, setEvents, setAvailability,
   createEvent,
@@ -281,6 +299,7 @@ export default function ChannelThread({
   const [history,         setHistory]         = useState([]);
   const [input,           setInput]           = useState('');
   const [typing,          setTyping]          = useState(false);
+  const [channelAITyping, setChannelAITyping] = useState(false); // AI thinking in group channel
   const [pendingFile,     setPendingFile]      = useState(null);  // { url, name, type, size }
   const [uploading,       setUploading]        = useState(false);
   const scrollRef   = useRef(null);
@@ -383,6 +402,37 @@ export default function ChannelThread({
 
     } else {
       onSendMessage(channel.id, text, attachments);
+
+      // If the message looks like a question and we have an AI responder,
+      // ask Claude and post the answer back to the channel.
+      if (!attachments && looksLikeQuestion(text) && onSendAIMessage) {
+        setChannelAITyping(true);
+        try {
+          const resp = await sendToMatMind(
+            text,
+            {
+              roster,
+              events,
+              availability,
+              kbEntries: kbEntries ?? [],
+              // Always use parent/Q&A mode in group channels — no tools, no mutations
+              userRole:  'parent',
+              userName:  'MatMind AI',
+              teamName,
+              gymName,
+            },
+            [], // no conversation history for channel responses
+          );
+
+          if (!resp.error && resp.text?.trim()) {
+            await onSendAIMessage(channel.id, resp.text.trim());
+          }
+        } catch (err) {
+          console.error('MatMind: channel AI response failed', err);
+        } finally {
+          setChannelAITyping(false);
+        }
+      }
     }
   };
 
@@ -436,7 +486,8 @@ export default function ChannelThread({
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', WebkitOverflowScrolling: 'touch' }}>
         {displayMsgs.map(m => <ChatBubble key={m.id} msg={m} isUser={false} />)}
 
-        {typing && (
+        {/* AI typing indicator — AI channel uses `typing`, group channels use `channelAITyping` */}
+        {(typing || channelAITyping) && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: BRAND.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {Brain(14, BRAND.columbia)}

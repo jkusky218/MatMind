@@ -400,6 +400,45 @@ export function useTeamData(auth) {
     return { ok: true };
   }, [auth]);
 
+  // ── sendAIMessage ────────────────────────────────────────────────────────────
+  // Posts a MatMind AI response to a group channel. Called after the AI
+  // processes a question posted in a non-AI channel.
+  const sendAIMessage = useCallback(async (channelSlug, text) => {
+    if (!text?.trim()) return;
+
+    // Demo mode: add directly to local state (no realtime)
+    if (isDemo || !supabase) {
+      setChannelMessages(prev => ({
+        ...prev,
+        [channelSlug]: [...(prev[channelSlug] ?? []), {
+          id: `ai-${Date.now()}`,
+          sender: 'MatMind AI',
+          role: 'ai',
+          text: text.trim(),
+          time: 'Now',
+          pinned: false,
+          attachments: null,
+        }],
+      }));
+      return;
+    }
+
+    const channelId = slugToId.current[channelSlug];
+    if (!channelId) return;
+
+    // Realtime subscription will pick this up and add it to channelMessages
+    await supabase.from('messages').insert({
+      channel_id:  channelId,
+      sender_id:   null,
+      sender_name: 'MatMind AI',
+      sender_role: 'coach', // valid enum value; is_ai=true overrides display role
+      content:     text.trim(),
+      is_ai:       true,
+      is_pinned:   false,
+      attachments: null,
+    });
+  }, []);
+
   // ── sendMessage ─────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (channelSlug, text, attachments = null) => {
     const senderName = auth.profile?.full_name ?? 'Coach';
@@ -474,6 +513,7 @@ export function useTeamData(auth) {
     recordAttendance,
     channelMessages,
     sendMessage,
+    sendAIMessage,
     createEvent,
     updateAvailabilityEntry,
     loading,
