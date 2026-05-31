@@ -151,8 +151,11 @@ export function useAuth() {
   const resetPassword = useCallback(async (email) => {
     if (!email?.trim()) return { ok: false, error: 'Email is required' };
     if (isDemo || !supabase) return { ok: true }; // demo: pretend it sent
+    // Trailing slash matters: Supabase's "https://*.mat-mind.com/**" allow-list
+    // pattern requires a path, so a bare origin can fail to match and fall back
+    // to the Site URL. Appending "/" guarantees it matches /**.
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.origin,
+      redirectTo: window.location.origin + '/',
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true };
