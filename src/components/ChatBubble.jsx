@@ -58,7 +58,7 @@ export default function ChatBubble({ msg, isOwn, canModerate, selected, onSelect
 
   return (
     <div
-      onClick={() => onSelect(selected ? null : msg.id)}
+      onClick={(e) => { e.stopPropagation(); onSelect(selected ? null : msg.id); }}
       style={{
         display: 'flex', gap: 8, alignItems: 'flex-start',
         marginBottom: 12, cursor: showActions || isOwn || canModerate ? 'pointer' : 'default',
