@@ -602,11 +602,19 @@ function NotifChannelRow({ label, icon, coachEnabled, parentEnabled, last }) {
 
 // ── Main SettingsPage ─────────────────────────────────────────────────────────
 
-export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings, onClose }) {
+export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings, onClose, push }) {
   const teamName       = teamSettings.teamName    || 'My Team';
   const primaryColor   = teamSettings.primaryColor   || '#1B3A5C';
   const secondaryColor = teamSettings.secondaryColor || '#6BADE4';
   const groups         = teamSettings.groups || [];
+
+  // Channels available for push notification prefs — dynamic: Announcements + one per non-coach group
+  const notifChannels = [
+    { slug: 'announcements', label: 'Announcements', icon: '📣' },
+    ...groups
+      .filter(g => g.id !== 'coaches')
+      .map(g => ({ slug: g.id, label: g.label, icon: '#️⃣' })),
+  ];
 
   const profile = auth.profile;
   const isAdmin = profile?.role === 'admin';
@@ -692,15 +700,65 @@ export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings
 
         {/* ── My Notifications ── */}
         <SectionLabel>My Notifications</SectionLabel>
-        <Card>
-          <NotifChannelRow icon="📣" label="Announcements"   sublabel="Team-wide updates"  coachEnabled parentEnabled />
-          <NotifChannelRow icon="#️⃣" label="Advanced"         coachEnabled parentEnabled />
-          <NotifChannelRow icon="#️⃣" label="Beginner"         coachEnabled parentEnabled />
-          <NotifChannelRow icon="#️⃣" label="Tots"             coachEnabled parentEnabled last />
-        </Card>
-        <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
-          Notification preferences will persist once push notification infrastructure is complete.
-        </p>
+        {!push?.supported ? (
+          <Card>
+            <div style={{ padding: '14px 16px' }}>
+              <p style={{ fontSize: 13, color: '#888', margin: 0 }}>
+                Push notifications are not supported in this browser. Install the app to your home screen to enable them.
+              </p>
+            </div>
+          </Card>
+        ) : !push?.subscribed ? (
+          <Card>
+            <div style={{ padding: '16px', textAlign: 'center' }}>
+              <p style={{ fontSize: 13, color: '#555', margin: '0 0 12px' }}>
+                Enable push notifications to get alerted when messages are posted to team channels — even when the app is closed.
+              </p>
+              <button
+                onClick={push?.subscribe}
+                disabled={push?.loading}
+                style={{
+                  width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
+                  background: push?.loading ? '#ccd5de' : BRAND.navy,
+                  color: '#fff', fontSize: 14, fontWeight: 700, cursor: push?.loading ? 'default' : 'pointer',
+                }}
+              >
+                {push?.loading ? 'Enabling…' : '🔔 Enable Notifications'}
+              </button>
+            </div>
+          </Card>
+        ) : (
+          <>
+            <Card>
+              {notifChannels.map((ch, i) => {
+                const isOn = push.channelPrefs?.includes(ch.slug) ?? true;
+                return (
+                  <div key={ch.slug} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '13px 16px',
+                    borderBottom: i < notifChannels.length - 1 ? '1px solid #f0f2f5' : 'none',
+                  }}>
+                    <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>{ch.icon}</span>
+                    <p style={{ flex: 1, fontSize: 14, fontWeight: 500, color: '#1a1a1a', margin: 0 }}>{ch.label}</p>
+                    <button onClick={() => push.updateChannelPref(ch.slug, !isOn)} style={{
+                      width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                      background: isOn ? BRAND.navy : '#dde3ea', position: 'relative', transition: 'background 0.15s',
+                    }}>
+                      <div style={{
+                        width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                        position: 'absolute', top: 3, left: isOn ? 21 : 3,
+                        transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }} />
+                    </button>
+                  </div>
+                );
+              })}
+            </Card>
+            <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
+              Toggle channels on or off. You can also tap 🔔 in any channel header to quickly mute it.
+            </p>
+          </>
+        )}
 
         {/* ── ADMIN SECTIONS ── */}
         {isAdmin && (
@@ -746,24 +804,6 @@ export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings
             </Card>
             <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
               Groups control channel access and event filtering. The Coaches group cannot be removed.
-            </p>
-
-            {/* Push Notification Channels */}
-            <SectionLabel adminOnly>Push Notification Channels</SectionLabel>
-            <Card>
-              <div style={{ padding: '10px 16px 4px', borderBottom: '1px solid #f0f2f5' }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginBottom: 4 }}>
-                  <p style={{ fontSize: 9, fontWeight: 700, color: '#8a96a3', textTransform: 'uppercase', letterSpacing: 0.5, margin: 0 }}>Coaches</p>
-                  <p style={{ fontSize: 9, fontWeight: 700, color: '#8a96a3', textTransform: 'uppercase', letterSpacing: 0.5, margin: 0 }}>Parents</p>
-                </div>
-              </div>
-              <NotifChannelRow icon="📣" label="Announcements" coachEnabled parentEnabled />
-              <NotifChannelRow icon="#️⃣" label="Advanced"      coachEnabled parentEnabled />
-              <NotifChannelRow icon="#️⃣" label="Beginner"      coachEnabled parentEnabled />
-              <NotifChannelRow icon="#️⃣" label="Tots"          coachEnabled parentEnabled last />
-            </Card>
-            <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
-              Controls which roles receive push notifications when messages are posted to each channel.
             </p>
 
             {/* Member Management */}

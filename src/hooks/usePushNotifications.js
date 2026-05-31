@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase, isDemo } from '../lib/supabase';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
-/** Convert a URL-safe base64 VAPID key to a Uint8Array for the browser API. */
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -16,14 +15,20 @@ function urlBase64ToUint8Array(base64String) {
 /**
  * usePushNotifications
  *
+ * @param {object} auth        — auth context (user + profile)
+ * @param {string[]} defaultChannels — slugs to subscribe by default (passed from parent)
+ *
  * Returns:
- *   supported  — true if the browser supports push notifications
- *   permission — 'default' | 'granted' | 'denied'
- *   subscribed — true if the current device is subscribed
- *   subscribe  — async fn to request permission + subscribe
- *   unsubscribe — async fn to remove the subscription
+ *   supported      — browser supports push
+ *   permission     — 'default' | 'granted' | 'denied'
+ *   subscribed     — device is currently subscribed
+ *   channelPrefs   — string[] of channel slugs the user wants notifs for
+ *   loading        — subscribe/unsubscribe in progress
+ *   subscribe      — async fn: request permission + subscribe
+ *   unsubscribe    — async fn: remove subscription
+ *   updateChannelPref(slug, enabled) — toggle one channel on/off, persists to DB
  */
-export function usePushNotifications(auth) {
+export function usePushNotifications(auth, defaultChannels = ['announcements']) {
   const supported =
     typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
@@ -31,27 +36,45 @@ export function usePushNotifications(auth) {
     'Notification'  in window &&
     !!VAPID_PUBLIC_KEY;
 
-  const [permission,  setPermission]  = useState(() =>
-    supported ? Notification.permission : 'denied'
-  );
-  const [subscribed, setSubscribed]  = useState(false);
-  const [loading,    setLoading]     = useState(false);
+  const [permission,    setPermission]    = useState(() => supported ? Notification.permission : 'denied');
+  const [subscribed,    setSubscribed]    = useState(false);
+  const [channelPrefs,  setChannelPrefs]  = useState(defaultChannels);
+  const [loading,       setLoading]       = useState(false);
 
-  // On mount, check if already subscribed
+  const userId = auth?.user?.id;
+  const teamId = auth?.profile?.team_id;
+
+  // On mount: check browser subscription + load channel prefs from DB
   useEffect(() => {
-    if (!supported || !auth?.user) return;
+    if (!supported || !userId) return;
+
+    // 1. Check browser push subscription
     navigator.serviceWorker.ready.then(async (reg) => {
       const existing = await reg.pushManager.getSubscription();
       setSubscribed(!!existing);
     }).catch(() => {});
-  }, [supported, auth?.user]);
+
+    // 2. Load channel prefs from Supabase
+    if (!isDemo && supabase) {
+      supabase
+        .from('push_subscriptions')
+        .select('channel_prefs')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.channel_prefs?.length) {
+            setChannelPrefs(data.channel_prefs);
+          }
+        });
+    }
+  }, [supported, userId]);
 
   const subscribe = async () => {
     if (!supported) return { ok: false, error: 'Push not supported in this browser' };
     setLoading(true);
 
     try {
-      // 1. Request permission
       const perm = await Notification.requestPermission();
       setPermission(perm);
       if (perm !== 'granted') {
@@ -59,24 +82,24 @@ export function usePushNotifications(auth) {
         return { ok: false, error: 'Permission not granted' };
       }
 
-      // 2. Subscribe via the service worker
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly:      true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
 
-      // 3. Save subscription to Supabase
-      if (!isDemo && supabase && auth?.user?.id && auth?.profile?.team_id) {
+      if (!isDemo && supabase && userId && teamId) {
         const { error } = await supabase.from('push_subscriptions').upsert({
-          user_id:      auth.user.id,
-          team_id:      auth.profile.team_id,
-          endpoint:     sub.endpoint,
-          subscription: sub.toJSON(),
-          user_agent:   navigator.userAgent.slice(0, 255),
+          user_id:       userId,
+          team_id:       teamId,
+          endpoint:      sub.endpoint,
+          subscription:  sub.toJSON(),
+          user_agent:    navigator.userAgent.slice(0, 255),
+          channel_prefs: defaultChannels,
         }, { onConflict: 'user_id,endpoint' });
 
         if (error) console.error('MatMind: failed to save push subscription', error.message);
+        else setChannelPrefs(defaultChannels);
       }
 
       setSubscribed(true);
@@ -96,13 +119,9 @@ export function usePushNotifications(auth) {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
-        // Remove from Supabase first
-        if (!isDemo && supabase && auth?.user?.id) {
-          await supabase
-            .from('push_subscriptions')
-            .delete()
-            .eq('user_id', auth.user.id)
-            .eq('endpoint', sub.endpoint);
+        if (!isDemo && supabase && userId) {
+          await supabase.from('push_subscriptions').delete()
+            .eq('user_id', userId).eq('endpoint', sub.endpoint);
         }
         await sub.unsubscribe();
       }
@@ -113,5 +132,23 @@ export function usePushNotifications(auth) {
     setLoading(false);
   };
 
-  return { supported, permission, subscribed, loading, subscribe, unsubscribe };
+  // Toggle one channel on/off — updates local state + DB immediately
+  const updateChannelPref = useCallback(async (slug, enabled) => {
+    const next = enabled
+      ? [...new Set([...channelPrefs, slug])]
+      : channelPrefs.filter(c => c !== slug);
+
+    setChannelPrefs(next);
+
+    if (!isDemo && supabase && userId) {
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .update({ channel_prefs: next })
+        .eq('user_id', userId);
+
+      if (error) console.error('MatMind: channel pref update failed', error.message);
+    }
+  }, [channelPrefs, userId]);
+
+  return { supported, permission, subscribed, channelPrefs, loading, subscribe, unsubscribe, updateChannelPref };
 }

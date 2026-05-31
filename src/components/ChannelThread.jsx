@@ -264,6 +264,7 @@ export default function ChannelThread({
   userRole,
   teamSettings = {},
   teamId,
+  push,
 }) {
   const teamName = teamSettings.teamName || 'Team';
   const gymName  = teamSettings.gymName  || 'Team Gym';
@@ -392,11 +393,30 @@ export default function ChannelThread({
           </p>
           <p style={{ fontSize: 11, color: '#999', margin: 0 }}>{channel.desc}</p>
         </div>
-        {isAI && (
+        {isAI ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E' }} title="Claude API connected" />
             <div style={{ padding: '3px 8px', borderRadius: 6, background: BRAND.columbiaLight, fontSize: 10, fontWeight: 600, color: BRAND.navy }}>Private</div>
           </div>
+        ) : push?.subscribed && (
+          /* Channel notification bell — only shown when push is enabled */
+          (() => {
+            const notifOn = push.channelPrefs?.includes(channel.id);
+            return (
+              <button
+                onClick={() => push.updateChannelPref(channel.id, !notifOn)}
+                title={notifOn ? 'Mute this channel' : 'Unmute this channel'}
+                style={{
+                  background: notifOn ? BRAND.columbiaLight : '#f0f2f5',
+                  border: `1px solid ${notifOn ? BRAND.columbia + '60' : '#e0e6ee'}`,
+                  borderRadius: 8, padding: '4px 9px', cursor: 'pointer',
+                  fontSize: 15, lineHeight: 1,
+                }}
+              >
+                {notifOn ? '🔔' : '🔕'}
+              </button>
+            );
+          })()
         )}
       </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isDemo } from '../lib/supabase';
-import { CHANNEL_NAME_TO_SLUG } from '../lib/constants';
+import { CHANNEL_NAME_TO_SLUG, GROUP_LABELS } from '../lib/constants';
 import {
   INITIAL_ROSTER,
   INITIAL_EVENTS,
@@ -436,7 +436,30 @@ export function useTeamData(auth) {
       attachments: attachments?.length ? attachments : null,
     });
     // Realtime subscription handles adding msg to state
-  }, [auth]);
+
+    // Fire-and-forget push notification to channel subscribers (skip AI channel)
+    if (channelSlug !== 'ai' && teamId) {
+      const channelLabel = channelSlug === 'announcements'
+        ? 'Announcements'
+        : (GROUP_LABELS[channelSlug] ?? (channelSlug.charAt(0).toUpperCase() + channelSlug.slice(1)));
+      const bodyText = text
+        ? `${senderName}: ${text.slice(0, 120)}${text.length > 120 ? '…' : ''}`
+        : attachments?.length ? `${senderName} shared a file` : senderName;
+
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title:        `#${channelLabel}`,
+          body:         bodyText,
+          teamId,
+          channelSlug,
+          senderUserId: auth.user?.id ?? null,
+          url:          '/',
+        }),
+      }).catch(err => console.warn('MatMind: push notify failed silently', err.message));
+    }
+  }, [auth, teamId]);
 
   return {
     roster,

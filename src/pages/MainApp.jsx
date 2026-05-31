@@ -14,113 +14,6 @@ import { useKnowledgeBase } from '../hooks/useKnowledgeBase';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import NotificationBanner from '../components/NotificationBanner';
 
-// ── Send Notification Sheet ───────────────────────────────────────────────────
-
-function SendNotificationSheet({ teamId, onClose }) {
-  const [title,   setTitle]   = useState('');
-  const [body,    setBody]    = useState('');
-  const [target,  setTarget]  = useState('all');
-  const [sending, setSending] = useState(false);
-  const [result,  setResult]  = useState(null);
-
-  const handleSend = async () => {
-    if (!title.trim() || !body.trim()) return;
-    setSending(true);
-    try {
-      const res = await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), body: body.trim(), teamId, targetRole: target }),
-      });
-      const data = await res.json();
-      setResult(data);
-    } catch {
-      setResult({ error: 'Could not reach the notification service.' });
-    }
-    setSending(false);
-  };
-
-  const inputStyle = {
-    width: '100%', padding: '11px 14px', borderRadius: 10,
-    border: '1.5px solid #e0e6ee', fontSize: 14, color: '#1a1a1a',
-    boxSizing: 'border-box', fontFamily: 'inherit',
-  };
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
-      <div style={{
-        position: 'relative', background: '#fff', borderRadius: '20px 20px 0 0',
-        padding: '20px 16px 36px', maxWidth: 430, width: '100%', margin: '0 auto',
-      }}>
-        <div style={{ width: 36, height: 4, background: '#dde3ea', borderRadius: 2, margin: '0 auto 20px' }} />
-
-        {result ? (
-          <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            {result.error ? (
-              <>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>⚠️</div>
-                <p style={{ fontSize: 15, fontWeight: 700, color: '#1a1a1a', marginBottom: 6 }}>Send failed</p>
-                <p style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>{result.error}</p>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>🔔</div>
-                <p style={{ fontSize: 15, fontWeight: 700, color: '#1a1a1a', marginBottom: 6 }}>Notification sent!</p>
-                <p style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>
-                  Delivered to {result.sent} device{result.sent !== 1 ? 's' : ''}.
-                  {result.failed > 0 ? ` (${result.failed} failed)` : ''}
-                </p>
-              </>
-            )}
-            <button onClick={onClose} style={{
-              width: '100%', padding: '13px 0', borderRadius: 12, border: 'none',
-              background: '#1B3A5C', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            }}>Done</button>
-          </div>
-        ) : (
-          <>
-            <p style={{ fontSize: 17, fontWeight: 700, color: '#1B3A5C', marginBottom: 16 }}>
-              🔔 Send Notification
-            </p>
-
-            <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>SEND TO</p>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-              {[['all', 'Everyone'], ['parent', 'Parents only'], ['coach', 'Coaches only']].map(([val, lbl]) => (
-                <button key={val} onClick={() => setTarget(val)} style={{
-                  flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                  cursor: 'pointer', border: '1.5px solid',
-                  borderColor: target === val ? '#1B3A5C' : '#e0e6ee',
-                  background: target === val ? '#E8F2FC' : 'transparent',
-                  color: target === val ? '#1B3A5C' : '#aaa',
-                }}>{lbl}</button>
-              ))}
-            </div>
-
-            <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>TITLE</p>
-            <input value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="e.g. Practice Cancelled Tonight"
-              style={{ ...inputStyle, marginBottom: 12 }} />
-
-            <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>MESSAGE</p>
-            <textarea value={body} onChange={e => setBody(e.target.value)}
-              placeholder="e.g. Practice is cancelled tonight due to gym conflict. See you Thursday!"
-              rows={3}
-              style={{ ...inputStyle, resize: 'none', lineHeight: 1.5, marginBottom: 20 }} />
-
-            <button onClick={handleSend} disabled={sending || !title.trim() || !body.trim()} style={{
-              width: '100%', padding: '14px 0', borderRadius: 12, border: 'none',
-              background: sending || !title.trim() || !body.trim() ? '#ccd5de' : '#1B3A5C',
-              color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-            }}>
-              {sending ? 'Sending…' : 'Send to all devices'}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 const TABS = [
   { id: 'messages',  label: 'Messages', Icon: Chat },
@@ -130,9 +23,9 @@ const TABS = [
 ];
 
 export default function MainApp({ auth }) {
-  const [tab, setTab]                 = useState('messages');
+  const [tab, setTab]                   = useState('messages');
   const [activeChannel, setActiveChannel] = useState(null);
-  const [adminOpen, setAdminOpen]     = useState(false);
+  const [adminOpen,    setAdminOpen]    = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const {
@@ -153,9 +46,6 @@ export default function MainApp({ auth }) {
     deleteEntry: deleteKbEntry,
   } = useKnowledgeBase(auth);
 
-  const push = usePushNotifications(auth);
-  const [notifyOpen, setNotifyOpen] = useState(false);
-
   const userRole = auth.profile?.role ?? 'coach';
   const isCoach  = userRole === 'coach' || userRole === 'admin' || !auth.profile;
   const isAdmin  = userRole === 'admin';
@@ -166,6 +56,15 @@ export default function MainApp({ auth }) {
     : [];
 
   const { settings: teamSettings, updateSettings } = useTeamSettings(auth);
+
+  // Default push channels: Announcements + all non-coach groups
+  const defaultPushChannels = [
+    'announcements',
+    ...(teamSettings.groups ?? [])
+      .filter(g => g.id !== 'coaches')
+      .map(g => g.id),
+  ];
+  const push = usePushNotifications(auth, defaultPushChannels);
 
   function handleMemberAdded({ type, data }) {
     if (type === 'coach' && data) {
@@ -243,13 +142,6 @@ export default function MainApp({ auth }) {
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isCoach && push.subscribed && (
-              <button onClick={() => setNotifyOpen(true)} title="Send push notification" style={{
-                background: 'rgba(107,173,228,0.18)', border: '1px solid rgba(107,173,228,0.3)',
-                borderRadius: 8, padding: '5px 9px', fontSize: 15, color: BRAND.columbia,
-                cursor: 'pointer', lineHeight: 1,
-              }}>🔔</button>
-            )}
             {isCoach && (
               <button onClick={() => setAdminOpen(true)} title="Add team member" style={{
                 background: 'rgba(107,173,228,0.18)', border: '1px solid rgba(107,173,228,0.3)',
@@ -286,14 +178,6 @@ export default function MainApp({ auth }) {
         </div>
       )}
 
-      {/* ── Send Notification sheet (coach only) ── */}
-      {notifyOpen && (
-        <SendNotificationSheet
-          teamId={auth.profile?.team_id}
-          onClose={() => setNotifyOpen(false)}
-        />
-      )}
-
       {/* ── Admin panel ── */}
       <AdminPanel
         open={adminOpen}
@@ -306,7 +190,7 @@ export default function MainApp({ auth }) {
       {/* ── Content ── */}
       <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)', position: 'relative' }}>
         {settingsOpen ? (
-          <SettingsPage auth={auth} teamSettings={teamSettings} onUpdateSettings={updateSettings} onClose={() => setSettingsOpen(false)} />
+          <SettingsPage auth={auth} teamSettings={teamSettings} onUpdateSettings={updateSettings} onClose={() => setSettingsOpen(false)} push={push} />
         ) : activeChannel ? (
           <ChannelThread
             channel={activeChannel}
@@ -327,6 +211,7 @@ export default function MainApp({ auth }) {
             userRole={auth.profile?.role ?? 'coach'}
             teamSettings={teamSettings}
             teamId={auth.profile?.team_id}
+            push={push}
           />
         ) : (
           <>
