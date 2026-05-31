@@ -4,6 +4,38 @@ import { ChevDown, School, Mail, Phone, UserIcon, Star } from './Icons';
 
 const PARENT_COLOR = '#0D9488'; // teal — distinct from all group colors
 
+// ── Tappable contact link ─────────────────────────────────────────────────────
+// Renders a full-row anchor (mailto: or tel:) with the appropriate icon.
+// stopPropagation so tapping doesn't collapse the parent card.
+
+function ContactLink({ type, value, icon }) {
+  if (!value) return null;
+  const href  = type === 'email' ? `mailto:${value}` : `tel:${value.replace(/\D/g, '')}`;
+  const color = type === 'email' ? BRAND.navy : '#16A34A';
+  return (
+    <a
+      href={href}
+      onClick={e => e.stopPropagation()}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '7px 10px', borderRadius: 8, margin: '2px 0',
+        background: type === 'email' ? `${BRAND.navy}08` : '#16A34A0D',
+        textDecoration: 'none', color,
+        fontSize: 12, fontWeight: 500,
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {icon(13, color)}
+      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {value}
+      </span>
+      <span style={{ fontSize: 11, opacity: 0.5, flexShrink: 0 }}>
+        {type === 'email' ? '✉' : '📞'}
+      </span>
+    </a>
+  );
+}
+
 const AVATAR_COLORS = {
   coaches: BRAND.gold,
   tots: '#7B5EA7',
@@ -64,21 +96,11 @@ function ParentCard({ parent, expanded, onToggle }) {
 
       {/* Expanded contact info */}
       {expanded && (
-        <div style={{ padding: '0 14px 12px', borderTop: '1px solid #f0f0f0', paddingTop: 10 }}>
-          {parent.email && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 6 }}>
-              {Mail(12, '#aaa')}
-              <span style={{ color: BRAND.navyLight }}>{parent.email}</span>
-            </div>
-          )}
-          {parent.phone && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-              {Phone(12, '#aaa')}
-              <span style={{ color: '#555' }}>{parent.phone}</span>
-            </div>
-          )}
+        <div style={{ padding: '0 10px 10px', borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
+          <ContactLink type="email" value={parent.email} icon={Mail} />
+          <ContactLink type="phone" value={parent.phone} icon={Phone} />
           {!parent.email && !parent.phone && (
-            <p style={{ fontSize: 11, color: '#bbb', fontStyle: 'italic', margin: 0 }}>No contact info on file</p>
+            <p style={{ fontSize: 11, color: '#bbb', fontStyle: 'italic', margin: '4px 0 0' }}>No contact info on file</p>
           )}
         </div>
       )}
@@ -147,40 +169,34 @@ function AthleteCard({ member: m, expanded, onToggle }) {
           )}
           {isC ? (
             m.parent1 && (
-              <div style={{ background: '#f5f7fa', borderRadius: 8, padding: '10px 12px' }}>
-                <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>{m.parent1.name}</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>{Mail(12, '#aaa')}<span style={{ color: BRAND.navyLight }}>{m.parent1.email}</span></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>{Phone(12, '#aaa')}<span style={{ color: '#555' }}>{m.parent1.phone}</span></div>
-                </div>
+              <div style={{ background: '#f5f7fa', borderRadius: 8, padding: '8px 10px' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px', paddingLeft: 2 }}>{m.parent1.name}</p>
+                <ContactLink type="email" value={m.parent1.email} icon={Mail} />
+                <ContactLink type="phone" value={m.parent1.phone} icon={Phone} />
               </div>
             )
           ) : (
             <>
               {m.parent1 && (
-                <div style={{ background: '#f5f7fa', borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <div style={{ background: '#f5f7fa', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     {UserIcon(13, '#888')}
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>Parent / Guardian 1</span>
                   </div>
-                  <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px', color: '#1a1a1a' }}>{m.parent1.name}</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>{Mail(12, '#aaa')}<span style={{ color: BRAND.navyLight }}>{m.parent1.email}</span></div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>{Phone(12, '#aaa')}<span style={{ color: '#555' }}>{m.parent1.phone}</span></div>
-                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px', color: '#1a1a1a', paddingLeft: 2 }}>{m.parent1.name}</p>
+                  <ContactLink type="email" value={m.parent1.email} icon={Mail} />
+                  <ContactLink type="phone" value={m.parent1.phone} icon={Phone} />
                 </div>
               )}
               {m.parent2 && (
-                <div style={{ background: '#f5f7fa', borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <div style={{ background: '#f5f7fa', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     {UserIcon(13, '#888')}
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>Parent / Guardian 2</span>
                   </div>
-                  <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px', color: '#1a1a1a' }}>{m.parent2.name}</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>{Mail(12, '#aaa')}<span style={{ color: BRAND.navyLight }}>{m.parent2.email}</span></div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>{Phone(12, '#aaa')}<span style={{ color: '#555' }}>{m.parent2.phone}</span></div>
-                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px', color: '#1a1a1a', paddingLeft: 2 }}>{m.parent2.name}</p>
+                  <ContactLink type="email" value={m.parent2.email} icon={Mail} />
+                  <ContactLink type="phone" value={m.parent2.phone} icon={Phone} />
                 </div>
               )}
               {!m.parent1 && !m.parent2 && (
