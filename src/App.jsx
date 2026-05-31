@@ -65,6 +65,17 @@ export default function App() {
   const { teamBranding, loading: brandingLoading, notFound } = useTeamResolver();
   const { pullY, released, threshold } = usePullToRefresh();
 
+  // Super admin team-switching: when a super admin visits a subdomain whose
+  // team differs from their profile's current team_id, silently update the DB
+  // so Supabase RLS scopes all queries to the correct team.
+  useEffect(() => {
+    if (!auth.isSuperAdmin)       return;
+    if (!teamBranding?.teamId)    return;
+    if (!auth.profile)            return;
+    if (auth.profile.team_id === teamBranding.teamId) return;
+    auth.switchTeam(teamBranding.teamId);
+  }, [auth.isSuperAdmin, teamBranding?.teamId, auth.profile?.team_id]);
+
   const pullProgress  = Math.min(pullY / threshold, 1);
   const showIndicator = pullY > 12;
 

@@ -19,9 +19,10 @@ const DEMO_USERS = {
 };
 
 export function useAuth() {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user,         setUser]         = useState(null);
+  const [profile,      setProfile]      = useState(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [loading,      setLoading]      = useState(true);
 
   useEffect(() => {
     if (isDemo) {
@@ -52,17 +53,35 @@ export function useAuth() {
   }, []);
 
   async function fetchProfile(userId) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (error) {
-      console.error('MatMind: could not load profile — RLS or missing row?', error.message);
+    // Fetch profile + super_admins check in parallel
+    const [profileResult, superAdminResult] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', userId).single(),
+      supabase.from('super_admins').select('user_id').eq('user_id', userId).maybeSingle(),
+    ]);
+
+    if (profileResult.error) {
+      console.error('MatMind: could not load profile — RLS or missing row?', profileResult.error.message);
     }
-    setProfile(data ?? null);
+
+    setProfile(profileResult.data ?? null);
+    setIsSuperAdmin(!!superAdminResult.data);
     setLoading(false);
   }
+
+  // switchTeam — super admins call this when visiting a different subdomain.
+  // Updates the profile's team_id in the DB so Supabase RLS scopes queries correctly.
+  const switchTeam = useCallback(async (newTeamId) => {
+    if (!user?.id || isDemo || !supabase || !newTeamId) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ team_id: newTeamId })
+      .eq('id', user.id);
+    if (error) {
+      console.error('MatMind: switchTeam failed', error.message);
+      return;
+    }
+    setProfile(prev => prev ? { ...prev, team_id: newTeamId } : prev);
+  }, [user?.id]);
 
   const signIn = useCallback(async (email, password, role) => {
     if (isDemo) {
@@ -110,7 +129,9 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    switchTeam,
     isDemo,
-    isCoach: profile?.role === 'coach' || profile?.role === 'admin',
+    isSuperAdmin,
+    isCoach: isSuperAdmin || profile?.role === 'coach' || profile?.role === 'admin',
   };
 }

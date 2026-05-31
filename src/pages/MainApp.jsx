@@ -47,8 +47,8 @@ export default function MainApp({ auth }) {
   } = useKnowledgeBase(auth);
 
   const userRole = auth.profile?.role ?? 'coach';
-  const isCoach  = userRole === 'coach' || userRole === 'admin' || !auth.profile;
-  const isAdmin  = userRole === 'admin';
+  const isCoach  = auth.isSuperAdmin || userRole === 'coach' || userRole === 'admin' || !auth.profile;
+  const isAdmin  = auth.isSuperAdmin || userRole === 'admin';
 
   // Athletes linked to the current parent account (empty for coaches/admins)
   const myAthletes = userRole === 'parent'
