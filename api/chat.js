@@ -247,7 +247,14 @@ function buildSystemPrompt({ roster = [], events = [], availability = {}, attend
     : 'No coaches loaded yet.';
 
   const eventSummary = events.length > 0
-    ? events.map(e => `- ${e.title} | ${e.event_type || e.type} | ${e.event_date || e.date} ${e.start_time || e.time} | ${e.location_name || e.location} | Group: ${e.roster_group || e.group || 'all'}`).join('\n')
+    ? events.map(e => {
+        // Client sends normalized events with groups: string[] | null
+        // Fall back to legacy single-group fields for any raw DB rows
+        const groupStr = Array.isArray(e.groups) && e.groups.length
+          ? e.groups.join(', ')
+          : (e.roster_group || e.group) || 'all groups';
+        return `- ${e.title} | ${e.event_type || e.type} | ${e.event_date || e.date} ${e.start_time || e.time} | ${e.location_name || e.location} | Groups: ${groupStr}`;
+      }).join('\n')
     : 'No events scheduled yet.';
 
   const availSummary = Object.keys(availability).length > 0
