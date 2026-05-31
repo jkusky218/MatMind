@@ -148,7 +148,7 @@ export function useTeamData(auth) {
     if (isDemo || !supabase || !teamId) return;
 
     // Athletes
-    const { data: athleteRows } = await supabase
+    const { data: athleteRows, error: athErr } = await supabase
       .from('athletes')
       .select(`
         id, first_name, last_name, weight, grade, school, roster_group,
@@ -159,19 +159,24 @@ export function useTeamData(auth) {
       .order('weight', { ascending: true });
 
     // Coaches
-    const { data: coachRows } = await supabase
+    const { data: coachRows, error: coachErr } = await supabase
       .from('coaches')
       .select(`id, title, roster_group, profiles(full_name, email, phone)`)
       .eq('team_id', teamId)
       .eq('active', true);
 
-    setRoster([
-      ...(coachRows ?? []).map(normalizeCoach),
-      ...(athleteRows ?? []).map(normalizeAthlete),
-    ]);
+    // Only replace the roster on a clean fetch — never blank it on a transient error.
+    if (!athErr && !coachErr) {
+      setRoster([
+        ...(coachRows ?? []).map(normalizeCoach),
+        ...(athleteRows ?? []).map(normalizeAthlete),
+      ]);
+    } else {
+      console.error('MatMind: roster fetch failed — keeping existing roster', (athErr || coachErr)?.message);
+    }
 
     // Parents
-    const { data: parentRows } = await supabase
+    const { data: parentRows, error: parentErr } = await supabase
       .from('profiles')
       .select(`
         id, full_name, email, phone,
@@ -181,11 +186,11 @@ export function useTeamData(auth) {
       `)
       .eq('team_id', teamId)
       .eq('role', 'parent');
-    setParents((parentRows ?? []).map(normalizeParent));
+    if (!parentErr) setParents((parentRows ?? []).map(normalizeParent));
 
     // Events
     const today = new Date().toISOString().slice(0, 10);
-    const { data: eventRows } = await supabase
+    const { data: eventRows, error: eventErr } = await supabase
       .from('events')
       .select('id, title, event_type, event_date, start_time, location_name, roster_group, roster_groups')
       .eq('team_id', teamId)
@@ -193,6 +198,10 @@ export function useTeamData(auth) {
       .order('event_date', { ascending: true })
       .limit(20);
 
+    if (eventErr) {
+      console.error('MatMind: events fetch failed — keeping existing events', eventErr.message);
+      return; // keep events/availability/channels/messages as-is
+    }
     const normalizedEvents = (eventRows ?? []).map(normalizeEvent);
     setEvents(normalizedEvents);
 
@@ -212,10 +221,20 @@ export function useTeamData(auth) {
     }
 
     // Channels + messages
-    const { data: channelRows } = await supabase
+    // IMPORTANT: never wipe existing channel history on a transient fetch error.
+    // A failed channels/messages query (network blip, RLS hiccup during a team
+    // switch, socket re-establishing after a deploy) used to reset everything to
+    // empty AND clear the slug→id maps, which broke sending too. We now only
+    // replace state on a confirmed successful fetch; on error we keep what we have.
+    const { data: channelRows, error: chErr } = await supabase
       .from('channels')
       .select('id, name, channel_type, roster_group, is_private')
       .eq('team_id', teamId);
+
+    if (chErr) {
+      console.error('MatMind: channels fetch failed — keeping existing channels/messages', chErr.message);
+      return;
+    }
 
     const sToId = {};
     const iToS = {};
@@ -223,29 +242,50 @@ export function useTeamData(auth) {
       const slug = CHANNEL_NAME_TO_SLUG[ch.name];
       if (slug) { sToId[slug] = ch.id; iToS[ch.id] = slug; }
     });
+
+    const channelUUIDs = Object.values(sToId);
+
+    if (channelUUIDs.length === 0) {
+      // No mapped channels resolved. If we already have history loaded, this is
+      // almost certainly a transient empty (e.g. replication lag right after a
+      // team switch) — keep what we have rather than blanking the screen.
+      setChannelMessages(prev => {
+        const hasHistory = Object.keys(prev).some(k => k !== 'ai' && (prev[k]?.length ?? 0) > 0);
+        if (hasHistory) return prev;
+        slugToId.current = sToId;
+        idToSlug.current = iToS;
+        return { ai: prev.ai ?? [] };
+      });
+      return;
+    }
+
+    const { data: msgRows, error: msgErr } = await supabase
+      .from('messages')
+      .select('id, channel_id, sender_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, edited_at, created_at')
+      .in('channel_id', channelUUIDs)
+      .order('created_at', { ascending: true });
+
+    if (msgErr) {
+      console.error('MatMind: messages fetch failed — keeping existing messages', msgErr.message);
+      // Still adopt the (valid) channel maps so sending/realtime keep working.
+      slugToId.current = sToId;
+      idToSlug.current = iToS;
+      return;
+    }
+
+    // Confirmed-good fetch: commit the channel maps and replace message state.
     slugToId.current = sToId;
     idToSlug.current = iToS;
 
-    const channelUUIDs = Object.values(sToId);
-    if (channelUUIDs.length > 0) {
-      const { data: msgRows } = await supabase
-        .from('messages')
-        .select('id, channel_id, sender_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, edited_at, created_at')
-        .in('channel_id', channelUUIDs)
-        .order('created_at', { ascending: true });
-
-      const grouped = { ai: [] };
-      (msgRows ?? []).forEach(m => {
-        const slug = iToS[m.channel_id];
-        if (slug) {
-          if (!grouped[slug]) grouped[slug] = [];
-          grouped[slug].push(normalizeMessage(m));
-        }
-      });
-      setChannelMessages(grouped);
-    } else {
-      setChannelMessages({ ai: [] });
-    }
+    const grouped = { ai: [] };
+    (msgRows ?? []).forEach(m => {
+      const slug = iToS[m.channel_id];
+      if (slug) {
+        if (!grouped[slug]) grouped[slug] = [];
+        grouped[slug].push(normalizeMessage(m));
+      }
+    });
+    setChannelMessages(prev => ({ ai: prev.ai ?? [], ...grouped }));
   }, [teamId]);
 
   // ── Supabase mode: initial load + realtime subscription ─────────────────────
@@ -271,10 +311,12 @@ export function useTeamData(auth) {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
           const slug = idToSlug.current[payload.new.channel_id];
           if (!slug) return;
-          setChannelMessages(prev => ({
-            ...prev,
-            [slug]: [...(prev[slug] ?? []), normalizeMessage(payload.new)],
-          }));
+          setChannelMessages(prev => {
+            const existing = prev[slug] ?? [];
+            // Dedupe: the sender already added this row optimistically via .select()
+            if (existing.some(m => m.id === payload.new.id)) return prev;
+            return { ...prev, [slug]: [...existing, normalizeMessage(payload.new)] };
+          });
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
           const slug = idToSlug.current[payload.new.channel_id];
@@ -494,17 +536,29 @@ export function useTeamData(auth) {
     const channelId = slugToId.current[channelSlug];
     if (!channelId) return;
 
-    // Realtime subscription will pick this up and add it to channelMessages
-    await supabase.from('messages').insert({
-      channel_id:  channelId,
-      sender_id:   null,
-      sender_name: 'MatMind AI',
-      sender_role: 'coach', // valid enum value; is_ai=true overrides display role
-      content:     text.trim(),
-      is_ai:       true,
-      is_pinned:   false,
-      attachments: null,
-    });
+    const { data: inserted, error } = await supabase
+      .from('messages')
+      .insert({
+        channel_id:  channelId,
+        sender_id:   null,
+        sender_name: 'MatMind AI',
+        sender_role: 'coach', // valid enum value; is_ai=true overrides display role
+        content:     text.trim(),
+        is_ai:       true,
+        is_pinned:   false,
+        attachments: null,
+      })
+      .select('id, channel_id, sender_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, edited_at, created_at')
+      .single();
+
+    if (error) { console.error('MatMind: AI message insert failed', error.message); return; }
+    if (inserted) {
+      setChannelMessages(prev => {
+        const existing = prev[channelSlug] ?? [];
+        if (existing.some(m => m.id === inserted.id)) return prev;
+        return { ...prev, [channelSlug]: [...existing, normalizeMessage(inserted)] };
+      });
+    }
   }, []);
 
   // ── sendMessage ─────────────────────────────────────────────────────────────
@@ -530,19 +584,40 @@ export function useTeamData(auth) {
     }
 
     const channelId = slugToId.current[channelSlug];
-    if (!channelId) return;
+    if (!channelId) {
+      console.error('MatMind: cannot send — no channel id for', channelSlug);
+      return { ok: false, error: 'Channel not found' };
+    }
 
-    await supabase.from('messages').insert({
-      channel_id: channelId,
-      sender_id: auth.user?.id ?? null,
-      sender_name: senderName,
-      sender_role: senderRole,
-      content: text,
-      is_ai: false,
-      is_pinned: false,
-      attachments: attachments?.length ? attachments : null,
-    });
-    // Realtime subscription handles adding msg to state
+    // Insert and read the row back so we can show it immediately. We do NOT rely
+    // solely on the realtime echo (which may be disabled or lagging) — the
+    // INSERT realtime handler dedupes by id so there's no double-render.
+    const { data: inserted, error } = await supabase
+      .from('messages')
+      .insert({
+        channel_id: channelId,
+        sender_id: auth.user?.id ?? null,
+        sender_name: senderName,
+        sender_role: senderRole,
+        content: text,
+        is_ai: false,
+        is_pinned: false,
+        attachments: attachments?.length ? attachments : null,
+      })
+      .select('id, channel_id, sender_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, edited_at, created_at')
+      .single();
+
+    if (error) {
+      console.error('MatMind: send message failed', error.message);
+      return { ok: false, error: error.message };
+    }
+    if (inserted) {
+      setChannelMessages(prev => {
+        const existing = prev[channelSlug] ?? [];
+        if (existing.some(m => m.id === inserted.id)) return prev; // realtime beat us
+        return { ...prev, [channelSlug]: [...existing, normalizeMessage(inserted)] };
+      });
+    }
 
     // Fire-and-forget push notification to channel subscribers (skip AI channel)
     if (channelSlug !== 'ai' && teamId) {
