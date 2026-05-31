@@ -60,7 +60,7 @@ function AddCoachForm({ onSuccess, teamId }) {
       const res = await fetch(ADMIN_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add_coach', data: form, teamId }),
+        body: JSON.stringify({ action: 'add_coach', data: form, teamId, redirectTo: window.location.origin + '/' }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
@@ -189,7 +189,7 @@ function AddAthleteForm({ onSuccess, teamId, defaultSchool = '' }) {
       const res = await fetch(ADMIN_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add_athlete', data: payload, teamId }),
+        body: JSON.stringify({ action: 'add_athlete', data: payload, teamId, redirectTo: window.location.origin + '/' }),
       });
       const json = await res.json();
       if (res.ok && json.success) {

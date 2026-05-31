@@ -27,14 +27,14 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 
-  const { action, data, teamId } = req.body ?? {};
+  const { action, data, teamId, redirectTo } = req.body ?? {};
   if (!action)  return res.status(400).json({ error: 'action is required' });
   if (!teamId)  return res.status(400).json({ error: 'teamId is required' });
 
   try {
     switch (action) {
-      case 'add_coach':    return res.status(200).json(await addCoach(admin, data, teamId));
-      case 'add_athlete':  return res.status(200).json(await addAthlete(admin, data, teamId));
+      case 'add_coach':    return res.status(200).json(await addCoach(admin, data, teamId, redirectTo));
+      case 'add_athlete':  return res.status(200).json(await addAthlete(admin, data, teamId, redirectTo));
       case 'list_members': return res.status(200).json(await listMembers(admin, teamId));
       case 'set_role':     return res.status(200).json(await setUserRole(admin, data, teamId));
       default:             return res.status(400).json({ error: `Unknown action: ${action}` });
@@ -47,8 +47,10 @@ export default async function handler(req, res) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Find an existing auth user by email, or invite them (sends an email). */
-async function resolveAuthUser(admin, email, fullName, role) {
+/** Find an existing auth user by email, or invite them (sends an email).
+ *  redirectTo: where the invite link returns — the inviting team's subdomain,
+ *  so the new member lands on the right team instead of the apex Site URL. */
+async function resolveAuthUser(admin, email, fullName, role, redirectTo) {
   // List users and search (Supabase doesn't have getUserByEmail in admin API)
   const { data: { users }, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw new Error(`listUsers: ${error.message}`);
@@ -57,9 +59,9 @@ async function resolveAuthUser(admin, email, fullName, role) {
   if (existing) return { userId: existing.id, isNew: false };
 
   // Not found — send invite
-  const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName, role },
-  });
+  const options = { data: { full_name: fullName, role } };
+  if (redirectTo) options.redirectTo = redirectTo;
+  const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, options);
   if (invErr) throw new Error(`Invite failed for ${email}: ${invErr.message}`);
   return { userId: invited.user.id, isNew: true };
 }
@@ -80,11 +82,11 @@ async function upsertProfile(admin, { userId, name, email, phone, role, teamId }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-async function addCoach(admin, { name, email, phone, title, group } = {}, teamId) {
+async function addCoach(admin, { name, email, phone, title, group } = {}, teamId, redirectTo) {
   if (!name?.trim()) throw new Error('Name is required');
   if (!email?.trim()) throw new Error('Email is required');
 
-  const { userId, isNew } = await resolveAuthUser(admin, email.trim(), name.trim(), 'coach');
+  const { userId, isNew } = await resolveAuthUser(admin, email.trim(), name.trim(), 'coach', redirectTo);
   await upsertProfile(admin, { userId, name: name.trim(), email: email.trim(), phone, role: 'coach', teamId });
 
   const { data: coach, error: coachErr } = await admin
@@ -109,7 +111,7 @@ async function addCoach(admin, { name, email, phone, title, group } = {}, teamId
   };
 }
 
-async function addAthlete(admin, { firstName, lastName, weight, grade, school, group, parent1, parent2 } = {}, teamId) {
+async function addAthlete(admin, { firstName, lastName, weight, grade, school, group, parent1, parent2 } = {}, teamId, redirectTo) {
   if (!firstName?.trim()) throw new Error('First name is required');
   if (!lastName?.trim())  throw new Error('Last name is required');
   if (!group)             throw new Error('Roster group is required');
@@ -135,7 +137,7 @@ async function addAthlete(admin, { firstName, lastName, weight, grade, school, g
   for (const [pData, isPrimary] of [[parent1, true], [parent2, false]]) {
     if (!pData?.email?.trim()) continue;
     try {
-      const { userId } = await resolveAuthUser(admin, pData.email.trim(), pData.name?.trim() || pData.email, 'parent');
+      const { userId } = await resolveAuthUser(admin, pData.email.trim(), pData.name?.trim() || pData.email, 'parent', redirectTo);
       await upsertProfile(admin, {
         userId,
         name: pData.name?.trim() || pData.email,
