@@ -143,6 +143,21 @@ export function useAuth() {
     await supabase.auth.signOut();
   }, []);
 
+  // resetPassword — sends a password-reset email. Works for any email without
+  // being signed in as that user, so it's used both on the login screen
+  // ("Forgot password?") and by admins to reset a member's password.
+  // The recovery link returns to the current subdomain, where App.jsx detects
+  // type=recovery in the hash and shows SetPasswordPage.
+  const resetPassword = useCallback(async (email) => {
+    if (!email?.trim()) return { ok: false, error: 'Email is required' };
+    if (isDemo || !supabase) return { ok: true }; // demo: pretend it sent
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }, []);
+
   return {
     user,
     profile,
@@ -152,6 +167,7 @@ export function useAuth() {
     signUp,
     signOut,
     switchTeam,
+    resetPassword,
     isDemo,
     isSuperAdmin,
     isCoach: isSuperAdmin || profile?.role === 'coach' || profile?.role === 'admin',

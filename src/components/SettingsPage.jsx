@@ -376,9 +376,10 @@ function GroupsManager({ initialGroups, onSave }) {
 
 // ── Member Management ─────────────────────────────────────────────────────────
 
-function MemberCard({ member, currentUserId, teamId, onRoleChange }) {
+function MemberCard({ member, currentUserId, teamId, onRoleChange, onResetPassword }) {
   const [saving,    setSaving]    = useState(false);
   const [localRole, setLocalRole] = useState(member.role);
+  const [resetState, setResetState] = useState('idle'); // idle | sending | sent | error
   const isMe = member.id === currentUserId;
 
   async function handleRoleChange(newRole) {
@@ -387,6 +388,14 @@ function MemberCard({ member, currentUserId, teamId, onRoleChange }) {
     await onRoleChange(member.id, newRole);
     setLocalRole(newRole);
     setSaving(false);
+  }
+
+  async function handleReset() {
+    if (resetState === 'sending' || !member.email) return;
+    setResetState('sending');
+    const res = await onResetPassword(member.email);
+    setResetState(res?.ok ? 'sent' : 'error');
+    if (res?.ok) setTimeout(() => setResetState('idle'), 4000);
   }
 
   const initials = (member.name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -447,6 +456,26 @@ function MemberCard({ member, currentUserId, teamId, onRoleChange }) {
             </button>
           ))}
           {isMe && <RoleBadge role={localRole} />}
+
+          {/* Send password reset — admin convenience */}
+          {!isMe && member.email && (
+            <button
+              onClick={handleReset}
+              disabled={resetState === 'sending'}
+              title={`Send a password reset link to ${member.email}`}
+              style={{
+                fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 9px',
+                border: '1px solid #e0e6ee', cursor: resetState === 'sending' ? 'default' : 'pointer',
+                background: resetState === 'sent' ? '#dcfce7' : '#fff',
+                color: resetState === 'sent' ? '#16a34a' : resetState === 'error' ? '#dc2626' : '#6b7280',
+              }}
+            >
+              {resetState === 'sending' ? 'Sending…'
+                : resetState === 'sent' ? '✓ Sent'
+                : resetState === 'error' ? 'Failed — retry'
+                : '🔑 Reset PW'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -553,6 +582,7 @@ function MemberManagement({ auth, teamId }) {
             currentUserId={auth?.user?.id}
             teamId={teamId}
             onRoleChange={handleRoleChange}
+            onResetPassword={(email) => auth.resetPassword(email)}
           />
         ))
       )}
