@@ -159,7 +159,7 @@ export default function MainApp({ auth }) {
   const isCoach = auth.profile?.role === 'coach' || auth.profile?.role === 'admin' || !auth.profile;
   const isAdmin = auth.profile?.role === 'admin';
 
-  const { settings: teamSettings } = useTeamSettings(auth);
+  const { settings: teamSettings, updateSettings } = useTeamSettings(auth);
 
   function handleMemberAdded({ type, data }) {
     if (type === 'coach' && data) {
@@ -300,7 +300,7 @@ export default function MainApp({ auth }) {
       {/* ── Content ── */}
       <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)', position: 'relative' }}>
         {settingsOpen ? (
-          <SettingsPage auth={auth} teamSettings={teamSettings} onClose={() => setSettingsOpen(false)} />
+          <SettingsPage auth={auth} teamSettings={teamSettings} onUpdateSettings={updateSettings} onClose={() => setSettingsOpen(false)} />
         ) : activeChannel ? (
           <ChannelThread
             channel={activeChannel}

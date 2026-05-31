@@ -1,20 +1,19 @@
-// SettingsPage — Full-screen settings view (same pattern as ChannelThread)
-// All users: Account info + personal notification prefs
-// Admin only: Team Branding, Roster Groups, Notification Channels
+// SettingsPage — Full-screen settings view
+// All users:  Account info, personal notification prefs (Soon)
+// Admin only: Team Branding, Roster Groups, Member Management
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BRAND, GROUPS, GROUP_LABELS, GROUP_COLORS } from '../lib/constants';
-import { ChevLeft, Settings, Shield, Plus, Trash } from './Icons';
+import { ChevLeft, Shield, Plus, Trash } from './Icons';
 
-// ── Shared UI ─────────────────────────────────────────────────────────────────
+// ── Shared UI primitives ──────────────────────────────────────────────────────
 
 function SectionLabel({ children, adminOnly }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '24px 0 8px 4px' }}>
-      <p style={{
-        fontSize: 11, fontWeight: 700, color: '#8a96a3',
-        textTransform: 'uppercase', letterSpacing: 0.8, margin: 0,
-      }}>{children}</p>
+      <p style={{ fontSize: 11, fontWeight: 700, color: '#8a96a3', textTransform: 'uppercase', letterSpacing: 0.8, margin: 0 }}>
+        {children}
+      </p>
       {adminOnly && (
         <span style={{
           fontSize: 9, fontWeight: 700, color: BRAND.gold,
@@ -29,63 +28,34 @@ function SectionLabel({ children, adminOnly }) {
 
 function Card({ children, style }) {
   return (
-    <div style={{
-      background: '#fff', borderRadius: 14,
-      border: '1px solid #eef1f5', overflow: 'hidden',
-      ...style,
-    }}>
+    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #eef1f5', overflow: 'hidden', ...style }}>
       {children}
     </div>
   );
 }
 
-function Row({ label, sublabel, icon, value, chevron, onClick, danger, last, tag }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={!onClick}
-      style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-        padding: '13px 16px', background: 'none', border: 'none',
-        borderBottom: last ? 'none' : '1px solid #f0f2f5',
-        cursor: onClick ? 'pointer' : 'default', textAlign: 'left',
-      }}
-    >
-      {icon && (
-        <div style={{
-          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-          background: danger ? '#fff1f1' : BRAND.columbiaLight,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16,
-        }}>
-          {icon}
-        </div>
-      )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{
-          fontSize: 14, fontWeight: 500, margin: 0,
-          color: danger ? '#dc2626' : '#1a1a1a',
-        }}>{label}</p>
-        {sublabel && (
-          <p style={{ fontSize: 12, color: '#8a96a3', margin: '1px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {sublabel}
-          </p>
-        )}
-      </div>
-      {value && <p style={{ fontSize: 13, color: '#8a96a3', margin: 0, flexShrink: 0 }}>{value}</p>}
-      {tag && (
-        <span style={{
-          fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 8px', flexShrink: 0,
-          background: tag === 'Soon' ? '#f0f2f5' : BRAND.columbiaLight,
-          color: tag === 'Soon' ? '#8a96a3' : BRAND.navy,
-        }}>{tag}</span>
-      )}
-      {chevron && <span style={{ color: '#c8d0da', fontSize: 18, flexShrink: 0 }}>›</span>}
-    </button>
-  );
+function Divider() {
+  return <div style={{ height: 1, background: '#f0f2f5' }} />;
 }
 
-// ── Role badge ────────────────────────────────────────────────────────────────
+function SaveCancelRow({ onSave, onCancel, saving, disabled }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #f0f2f5' }}>
+      <button onClick={onSave} disabled={saving || disabled} style={{
+        flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
+        background: (saving || disabled) ? '#ccd5de' : BRAND.navy,
+        color: '#fff', fontSize: 13, fontWeight: 700,
+        cursor: (saving || disabled) ? 'not-allowed' : 'pointer',
+      }}>
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+      <button onClick={onCancel} disabled={saving} style={{
+        padding: '10px 18px', borderRadius: 10, border: '1px solid #e0e6ee',
+        background: 'none', color: '#666', fontSize: 13, cursor: 'pointer',
+      }}>Cancel</button>
+    </div>
+  );
+}
 
 function RoleBadge({ role }) {
   const config = {
@@ -95,46 +65,215 @@ function RoleBadge({ role }) {
   };
   const c = config[role] ?? config.parent;
   return (
-    <span style={{
-      fontSize: 11, fontWeight: 700, borderRadius: 6,
-      padding: '3px 9px', background: c.bg, color: c.color,
-    }}>{c.label}</span>
+    <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 9px', background: c.bg, color: c.color }}>
+      {c.label}
+    </span>
   );
 }
 
-// ── Groups Manager (Admin) ────────────────────────────────────────────────────
+function StatusBadge({ status }) {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 600, borderRadius: 6, padding: '2px 7px',
+      background: status === 'active' ? '#dcfce7' : '#fef9c3',
+      color: status === 'active' ? '#16a34a' : '#a16207',
+    }}>
+      {status === 'active' ? 'Active' : 'Pending'}
+    </span>
+  );
+}
 
-const INITIAL_GROUPS = GROUPS.map(id => ({
-  id,
-  label: GROUP_LABELS[id] ?? id,
-  color: GROUP_COLORS[id] ?? '#888',
-}));
+// ── Team Name editor ──────────────────────────────────────────────────────────
+
+function TeamNameEditor({ teamName, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [value,   setValue]   = useState(teamName);
+  const [saving,  setSaving]  = useState(false);
+
+  useEffect(() => { setValue(teamName); }, [teamName]);
+
+  async function handleSave() {
+    if (!value.trim() || value.trim() === teamName) { setEditing(false); return; }
+    setSaving(true);
+    await onSave({ teamName: value.trim() });
+    setSaving(false);
+    setEditing(false);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', gap: 12 }}>
+        <span style={{ fontSize: 18, width: 32, textAlign: 'center', flexShrink: 0 }}>🏆</span>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 12, color: '#8a96a3', margin: '0 0 1px', fontWeight: 500 }}>Team Name</p>
+          {editing ? (
+            <input
+              autoFocus
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+              style={{
+                width: '100%', padding: '6px 10px', borderRadius: 8, fontSize: 14,
+                border: `1.5px solid ${BRAND.columbia}`, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          ) : (
+            <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: '#1a1a1a' }}>{teamName}</p>
+          )}
+        </div>
+        {!editing && (
+          <button onClick={() => setEditing(true)} style={{
+            fontSize: 12, fontWeight: 600, color: BRAND.columbia,
+            background: BRAND.columbiaLight, border: 'none', borderRadius: 8,
+            padding: '5px 12px', cursor: 'pointer', flexShrink: 0,
+          }}>Edit</button>
+        )}
+      </div>
+      {editing && (
+        <SaveCancelRow
+          onSave={handleSave}
+          onCancel={() => { setEditing(false); setValue(teamName); }}
+          saving={saving}
+          disabled={!value.trim()}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Color picker ──────────────────────────────────────────────────────────────
+
+const BRAND_PRESETS = [
+  '#1B3A5C', '#0F2440', '#2A4F7A', '#6BADE4',
+  '#C4A44A', '#7B5EA7', '#16a34a', '#dc2626',
+  '#ea580c', '#0891b2', '#0f766e', '#7c3aed',
+];
+
+function ColorPickerRow({ icon, label, colorKey, currentColor, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [hex,     setHex]     = useState(currentColor);
+  const [saving,  setSaving]  = useState(false);
+
+  useEffect(() => { setHex(currentColor); }, [currentColor]);
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave({ [colorKey]: hex });
+    setSaving(false);
+    setEditing(false);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', gap: 12 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+          background: currentColor, border: '1px solid rgba(0,0,0,0.08)',
+        }} />
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 12, color: '#8a96a3', margin: '0 0 1px', fontWeight: 500 }}>{label}</p>
+          <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#1a1a1a', fontFamily: 'monospace' }}>
+            {currentColor}
+          </p>
+        </div>
+        {!editing && (
+          <button onClick={() => setEditing(true)} style={{
+            fontSize: 12, fontWeight: 600, color: BRAND.columbia,
+            background: BRAND.columbiaLight, border: 'none', borderRadius: 8,
+            padding: '5px 12px', cursor: 'pointer', flexShrink: 0,
+          }}>Edit</button>
+        )}
+      </div>
+
+      {editing && (
+        <div style={{ padding: '0 16px 4px' }}>
+          {/* Preset swatches */}
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#8a96a3', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Presets</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+            {BRAND_PRESETS.map(c => (
+              <button key={c} onClick={() => setHex(c)} style={{
+                width: 30, height: 30, borderRadius: '50%', background: c,
+                border: 'none', cursor: 'pointer', flexShrink: 0,
+                boxShadow: hex === c ? `0 0 0 2px #fff, 0 0 0 4px ${c}` : '0 1px 2px rgba(0,0,0,0.15)',
+              }} />
+            ))}
+          </div>
+
+          {/* Custom hex input */}
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#8a96a3', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Custom</p>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 4 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 8, background: hex,
+              border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0,
+            }} />
+            <input
+              value={hex}
+              onChange={e => setHex(e.target.value)}
+              placeholder="#1B3A5C"
+              maxLength={7}
+              style={{
+                flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 14,
+                border: `1.5px solid ${BRAND.columbia}`, outline: 'none',
+                fontFamily: 'monospace',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <SaveCancelRow
+          onSave={handleSave}
+          onCancel={() => { setEditing(false); setHex(currentColor); }}
+          saving={saving}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Groups Manager ────────────────────────────────────────────────────────────
 
 const COLOR_PRESETS = [
   '#1B3A5C', '#6BADE4', '#7B5EA7', '#C4A44A',
   '#16a34a', '#dc2626', '#ea580c', '#0891b2',
 ];
 
-function GroupsManager() {
-  const [groups, setGroups]       = useState(INITIAL_GROUPS);
-  const [adding, setAdding]       = useState(false);
-  const [newLabel, setNewLabel]   = useState('');
-  const [newColor, setNewColor]   = useState(COLOR_PRESETS[0]);
-  const [confirmDel, setConfirmDel] = useState(null); // group id to confirm delete
+function GroupsManager({ initialGroups, onSave }) {
+  const [groups,     setGroups]     = useState(initialGroups);
+  const [dirty,      setDirty]      = useState(false);
+  const [adding,     setAdding]     = useState(false);
+  const [newLabel,   setNewLabel]   = useState('');
+  const [newColor,   setNewColor]   = useState(COLOR_PRESETS[0]);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [saving,     setSaving]     = useState(false);
+
+  useEffect(() => { setGroups(initialGroups); setDirty(false); }, [initialGroups]);
 
   function addGroup() {
     if (!newLabel.trim()) return;
     const id = newLabel.trim().toLowerCase().replace(/\s+/g, '_');
     if (groups.some(g => g.id === id)) return;
-    setGroups(prev => [...prev, { id, label: newLabel.trim(), color: newColor }]);
+    const next = [...groups, { id, label: newLabel.trim(), color: newColor }];
+    setGroups(next);
+    setDirty(true);
     setNewLabel('');
     setNewColor(COLOR_PRESETS[0]);
     setAdding(false);
   }
 
   function removeGroup(id) {
-    setGroups(prev => prev.filter(g => g.id !== id));
+    const next = groups.filter(g => g.id !== id);
+    setGroups(next);
+    setDirty(true);
     setConfirmDel(null);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave({ groups });
+    setSaving(false);
+    setDirty(false);
   }
 
   return (
@@ -164,7 +303,7 @@ function GroupsManager() {
             ) : (
               <button onClick={() => setConfirmDel(g.id)} style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                color: '#b0b8c2', fontSize: 16, padding: '0 2px', lineHeight: 1,
+                color: '#b0b8c2', fontSize: 18, padding: '0 2px', lineHeight: 1,
               }}>×</button>
             )
           )}
@@ -199,7 +338,8 @@ function GroupsManager() {
             <button onClick={addGroup} disabled={!newLabel.trim()} style={{
               flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
               background: newLabel.trim() ? BRAND.navy : '#ccd5de',
-              color: '#fff', fontSize: 13, fontWeight: 700, cursor: newLabel.trim() ? 'pointer' : 'not-allowed',
+              color: '#fff', fontSize: 13, fontWeight: 700,
+              cursor: newLabel.trim() ? 'pointer' : 'not-allowed',
             }}>Add Group</button>
             <button onClick={() => { setAdding(false); setNewLabel(''); }} style={{
               padding: '10px 16px', borderRadius: 10, border: '1px solid #e0e6ee',
@@ -210,19 +350,217 @@ function GroupsManager() {
       ) : (
         <button onClick={() => setAdding(true)} style={{
           width: '100%', padding: '12px 16px', background: 'none',
-          border: 'none', borderTop: '1px solid #f0f2f5', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: 8,
+          border: 'none', borderTop: groups.length ? '1px solid #f0f2f5' : 'none',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
           color: BRAND.columbia, fontSize: 13, fontWeight: 600,
         }}>
-          {Plus(14, BRAND.columbia)}
-          Add Group
+          {Plus(14, BRAND.columbia)} Add Group
         </button>
+      )}
+
+      {dirty && !adding && (
+        <div style={{ padding: '0 16px 14px' }}>
+          <button onClick={handleSave} disabled={saving} style={{
+            width: '100%', padding: '11px 0', borderRadius: 10, border: 'none',
+            background: saving ? '#ccd5de' : BRAND.navy,
+            color: '#fff', fontSize: 13, fontWeight: 700,
+            cursor: saving ? 'not-allowed' : 'pointer',
+          }}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-// ── Notification Channel Row ──────────────────────────────────────────────────
+// ── Member Management ─────────────────────────────────────────────────────────
+
+function MemberCard({ member, currentUserId, teamId, onRoleChange }) {
+  const [saving,    setSaving]    = useState(false);
+  const [localRole, setLocalRole] = useState(member.role);
+  const isMe = member.id === currentUserId;
+
+  async function handleRoleChange(newRole) {
+    if (newRole === localRole || isMe) return;
+    setSaving(true);
+    await onRoleChange(member.id, newRole);
+    setLocalRole(newRole);
+    setSaving(false);
+  }
+
+  const initials = (member.name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+  // Which roles can this member be assigned?
+  const availableRoles = member.role === 'parent' || localRole === 'parent'
+    ? ['parent', 'admin']
+    : ['coach', 'admin'];
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+      padding: '12px 16px', borderBottom: '1px solid #f0f2f5',
+    }}>
+      {/* Avatar */}
+      <div style={{
+        width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+        background: localRole === 'admin' ? BRAND.goldLight
+          : localRole === 'coach' ? BRAND.columbiaLight : '#f3f0ff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 13, fontWeight: 700,
+        color: localRole === 'admin' ? BRAND.goldDark
+          : localRole === 'coach' ? BRAND.navy : '#7B5EA7',
+      }}>
+        {initials}
+      </div>
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: '#1a1a1a' }}>{member.name}</p>
+          {isMe && <span style={{ fontSize: 10, color: '#8a96a3', fontStyle: 'italic' }}>you</span>}
+        </div>
+        <p style={{ fontSize: 11, color: '#8a96a3', margin: '0 0 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {member.email}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <StatusBadge status={member.status} />
+          {/* Role pills */}
+          {!isMe && availableRoles.map(r => (
+            <button
+              key={r}
+              onClick={() => handleRoleChange(r)}
+              disabled={saving}
+              style={{
+                fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 9px',
+                border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
+                background: localRole === r
+                  ? (r === 'admin' ? BRAND.goldLight : r === 'coach' ? BRAND.columbiaLight : '#f3f0ff')
+                  : '#f0f2f5',
+                color: localRole === r
+                  ? (r === 'admin' ? BRAND.goldDark : r === 'coach' ? BRAND.navy : '#7B5EA7')
+                  : '#8a96a3',
+                opacity: saving ? 0.6 : 1,
+              }}
+            >
+              {r.charAt(0).toUpperCase() + r.slice(1)}
+            </button>
+          ))}
+          {isMe && <RoleBadge role={localRole} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MemberManagement({ auth, teamId }) {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [search,  setSearch]  = useState('');
+
+  useEffect(() => {
+    if (!teamId) return;
+    setLoading(true);
+    fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list_members', teamId }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) setError(data.error);
+        else setMembers(data.members ?? []);
+        setLoading(false);
+      })
+      .catch(err => { setError(err.message); setLoading(false); });
+  }, [teamId]);
+
+  async function handleRoleChange(userId, role) {
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_role', data: { userId, role }, teamId }),
+    });
+    const data = await res.json();
+    if (data.error) console.error('Role change failed:', data.error);
+    else setMembers(prev => prev.map(m => m.id === userId ? { ...m, role } : m));
+  }
+
+  const filtered = members.filter(m =>
+    !search || m.name?.toLowerCase().includes(search.toLowerCase()) || m.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const counts = {
+    admin:  members.filter(m => m.role === 'admin').length,
+    coach:  members.filter(m => m.role === 'coach').length,
+    parent: members.filter(m => m.role === 'parent').length,
+    pending: members.filter(m => m.status === 'pending').length,
+  };
+
+  if (loading) return (
+    <div style={{ padding: '24px 16px', textAlign: 'center', color: '#8a96a3', fontSize: 13 }}>
+      Loading members…
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ padding: '16px', color: '#dc2626', fontSize: 13 }}>
+      Error: {error}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Summary chips */}
+      <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderBottom: '1px solid #f0f2f5', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Admins',  count: counts.admin,  color: BRAND.goldDark,  bg: BRAND.goldLight },
+          { label: 'Coaches', count: counts.coach,  color: BRAND.navy,      bg: BRAND.columbiaLight },
+          { label: 'Parents', count: counts.parent, color: '#7B5EA7',       bg: '#f3f0ff' },
+          { label: 'Pending', count: counts.pending, color: '#a16207',      bg: '#fef9c3' },
+        ].map(({ label, count, color, bg }) => (
+          <div key={label} style={{ background: bg, borderRadius: 8, padding: '4px 10px', display: 'flex', gap: 5, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color }}>{count}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f2f5' }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or email…"
+          style={{
+            width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
+            border: '1.5px solid #e0e6ee', outline: 'none', boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
+      {/* Member list */}
+      {filtered.length === 0 ? (
+        <p style={{ padding: '20px', textAlign: 'center', color: '#b0b8c2', fontSize: 13, fontStyle: 'italic', margin: 0 }}>
+          {search ? 'No members match your search.' : 'No members found.'}
+        </p>
+      ) : (
+        filtered.map((m, i) => (
+          <MemberCard
+            key={m.id}
+            member={m}
+            currentUserId={auth?.user?.id}
+            teamId={teamId}
+            onRoleChange={handleRoleChange}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+// ── Notification Channel Row (toggles — UI only until push prefs table built) ─
 
 function NotifChannelRow({ label, icon, coachEnabled, parentEnabled, last }) {
   const [coach,  setCoach]  = useState(coachEnabled);
@@ -240,8 +578,7 @@ function NotifChannelRow({ label, icon, coachEnabled, parentEnabled, last }) {
           <div style={{
             width: 16, height: 16, borderRadius: '50%', background: '#fff',
             position: 'absolute', top: 2, left: on ? 18 : 2,
-            transition: 'left 0.15s',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+            transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
           }} />
         </button>
       </div>
@@ -250,8 +587,7 @@ function NotifChannelRow({ label, icon, coachEnabled, parentEnabled, last }) {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 16px',
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
       borderBottom: last ? 'none' : '1px solid #f0f2f5',
     }}>
       <span style={{ fontSize: 16 }}>{icon}</span>
@@ -266,13 +602,16 @@ function NotifChannelRow({ label, icon, coachEnabled, parentEnabled, last }) {
 
 // ── Main SettingsPage ─────────────────────────────────────────────────────────
 
-export default function SettingsPage({ auth, teamSettings = {}, onClose }) {
-  const teamName = teamSettings.teamName || 'My Team';
-  const profile  = auth.profile;
-  const isAdmin  = profile?.role === 'admin';
-  const isCoach  = profile?.role === 'coach' || profile?.role === 'admin';
-  const initials = (profile?.full_name ?? 'U')
-    .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings, onClose }) {
+  const teamName       = teamSettings.teamName    || 'My Team';
+  const primaryColor   = teamSettings.primaryColor   || '#1B3A5C';
+  const secondaryColor = teamSettings.secondaryColor || '#6BADE4';
+  const groups         = teamSettings.groups || [];
+
+  const profile = auth.profile;
+  const isAdmin = profile?.role === 'admin';
+  const teamId  = profile?.team_id;
+  const initials = (profile?.full_name ?? 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   return (
     <div style={{
@@ -293,11 +632,10 @@ export default function SettingsPage({ auth, teamSettings = {}, onClose }) {
         }}>
           {ChevLeft(18, '#fff')}
         </button>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontWeight: 700, fontSize: 16, color: '#fff', margin: 0 }}>Settings</p>
-        </div>
+        <p style={{ flex: 1, fontWeight: 700, fontSize: 16, color: '#fff', margin: 0 }}>Settings</p>
         {isAdmin && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5,
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5,
             background: `${BRAND.gold}25`, borderRadius: 8, padding: '4px 10px',
             border: `1px solid ${BRAND.gold}40`,
           }}>
@@ -313,7 +651,6 @@ export default function SettingsPage({ auth, teamSettings = {}, onClose }) {
         {/* ── Account ── */}
         <SectionLabel>Account</SectionLabel>
         <Card>
-          {/* Avatar + name row */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 14,
             padding: '16px 16px 14px', borderBottom: '1px solid #f0f2f5',
@@ -333,24 +670,36 @@ export default function SettingsPage({ auth, teamSettings = {}, onClose }) {
               <RoleBadge role={profile?.role ?? 'coach'} />
             </div>
           </div>
-          <Row icon="✉️" label="Email"
-            sublabel={auth.user?.email ?? 'Not signed in'}
-            last={false} />
-          <Row icon="🏫" label="Team"
-            sublabel={isAdmin ? `${teamName} · Admin access` : teamName}
-            last />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderBottom: '1px solid #f0f2f5' }}>
+            <span style={{ fontSize: 18, width: 32, textAlign: 'center' }}>✉️</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 12, color: '#8a96a3', margin: '0 0 1px', fontWeight: 500 }}>Email</p>
+              <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: '#1a1a1a' }}>{auth.user?.email ?? 'Not signed in'}</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px' }}>
+            <span style={{ fontSize: 18, width: 32, textAlign: 'center' }}>🏫</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 12, color: '#8a96a3', margin: '0 0 1px', fontWeight: 500 }}>Team</p>
+              <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: '#1a1a1a' }}>
+                {isAdmin ? `${teamName} · Admin access` : teamName}
+              </p>
+            </div>
+          </div>
         </Card>
 
         {/* ── My Notifications ── */}
         <SectionLabel>My Notifications</SectionLabel>
         <Card>
-          <Row icon="📣" label="Announcements"    sublabel="Team-wide updates"  tag="Soon" />
-          <Row icon="#️⃣" label="Advanced channel"  sublabel="Skill group chat"   tag="Soon" />
-          <Row icon="#️⃣" label="Beginner channel"  sublabel="Skill group chat"   tag="Soon" />
-          <Row icon="#️⃣" label="Tots channel"      sublabel="Youngest wrestlers" tag="Soon" last />
+          <NotifChannelRow icon="📣" label="Announcements"   sublabel="Team-wide updates"  coachEnabled parentEnabled />
+          <NotifChannelRow icon="#️⃣" label="Advanced"         coachEnabled parentEnabled />
+          <NotifChannelRow icon="#️⃣" label="Beginner"         coachEnabled parentEnabled />
+          <NotifChannelRow icon="#️⃣" label="Tots"             coachEnabled parentEnabled last />
         </Card>
         <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
-          Per-channel notification preferences will be available once push notifications are configured.
+          Notification preferences will persist once push notification infrastructure is complete.
         </p>
 
         {/* ── ADMIN SECTIONS ── */}
@@ -359,23 +708,44 @@ export default function SettingsPage({ auth, teamSettings = {}, onClose }) {
             {/* Team Branding */}
             <SectionLabel adminOnly>Team Branding</SectionLabel>
             <Card>
-              <Row icon="🏆" label="Team Name"   sublabel={teamName} chevron tag="Soon" />
-              <Row icon="🎨" label="Logo"        sublabel="Upload team logo"  chevron tag="Soon" />
-              <Row icon="🔵" label="Primary Color"   sublabel={teamSettings.primaryColor   || '#1B3A5C'} chevron tag="Soon" />
-              <Row icon="🔷" label="Secondary Color"  sublabel={teamSettings.secondaryColor || '#6BADE4'} chevron tag="Soon" last />
+              <TeamNameEditor teamName={teamName} onSave={onUpdateSettings} />
+              <Divider />
+              <ColorPickerRow
+                icon="🔵" label="Primary Color"
+                colorKey="primaryColor" currentColor={primaryColor}
+                onSave={onUpdateSettings}
+              />
+              <Divider />
+              <ColorPickerRow
+                icon="🔷" label="Secondary Color"
+                colorKey="secondaryColor" currentColor={secondaryColor}
+                onSave={onUpdateSettings}
+              />
+              <Divider />
+              {/* Logo — deferred until Supabase Storage bucket is set up */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px' }}>
+                <span style={{ fontSize: 18, width: 32, textAlign: 'center' }}>🖼️</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 12, color: '#8a96a3', margin: '0 0 1px', fontWeight: 500 }}>Team Logo</p>
+                  <p style={{ fontSize: 13, color: '#b0b8c2', margin: 0 }}>Upload coming soon</p>
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 8px',
+                  background: '#f0f2f5', color: '#8a96a3',
+                }}>Soon</span>
+              </div>
             </Card>
             <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
-              Branding updates will apply across the entire app for all team members.
+              Branding updates apply immediately across the entire app for all team members.
             </p>
 
             {/* Roster Groups */}
             <SectionLabel adminOnly>Roster Groups</SectionLabel>
             <Card>
-              <GroupsManager />
+              <GroupsManager initialGroups={groups} onSave={onUpdateSettings} />
             </Card>
             <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
-              Groups determine channel access and event filtering. The Coaches group cannot be removed.
-              Changes will sync to the database in a future update.
+              Groups control channel access and event filtering. The Coaches group cannot be removed.
             </p>
 
             {/* Push Notification Channels */}
@@ -399,26 +769,33 @@ export default function SettingsPage({ auth, teamSettings = {}, onClose }) {
             {/* Member Management */}
             <SectionLabel adminOnly>Member Management</SectionLabel>
             <Card>
-              <Row icon="👤" label="Promote to Admin"
-                sublabel="Grant admin access to a coach or parent"
-                chevron tag="Soon" />
-              <Row icon="📋" label="View All Members"
-                sublabel="Roster, roles, and invite status"
-                chevron tag="Soon" last />
+              {teamId
+                ? <MemberManagement auth={auth} teamId={teamId} />
+                : <p style={{ padding: '16px', color: '#8a96a3', fontSize: 13, margin: 0 }}>Team ID not available.</p>
+              }
             </Card>
+            <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
+              Tap a role pill to change a member's access level. Pending members have not yet signed in.
+            </p>
           </>
         )}
 
         {/* ── Sign Out ── */}
         <SectionLabel>Account Actions</SectionLabel>
         <Card>
-          <Row
-            icon="🚪"
-            label="Sign Out"
-            danger
+          <button
             onClick={auth.signOut}
-            last
-          />
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+              padding: '13px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <div style={{
+              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              background: '#fff1f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+            }}>🚪</div>
+            <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: '#dc2626' }}>Sign Out</p>
+          </button>
         </Card>
 
         <p style={{ fontSize: 11, color: '#c8d0da', textAlign: 'center', margin: '24px 0 0' }}>

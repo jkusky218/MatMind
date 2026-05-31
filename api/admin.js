@@ -33,9 +33,11 @@ export default async function handler(req, res) {
 
   try {
     switch (action) {
-      case 'add_coach':   return res.status(200).json(await addCoach(admin, data, teamId));
-      case 'add_athlete': return res.status(200).json(await addAthlete(admin, data, teamId));
-      default:            return res.status(400).json({ error: `Unknown action: ${action}` });
+      case 'add_coach':    return res.status(200).json(await addCoach(admin, data, teamId));
+      case 'add_athlete':  return res.status(200).json(await addAthlete(admin, data, teamId));
+      case 'list_members': return res.status(200).json(await listMembers(admin, teamId));
+      case 'set_role':     return res.status(200).json(await setUserRole(admin, data, teamId));
+      default:             return res.status(400).json({ error: `Unknown action: ${action}` });
     }
   } catch (err) {
     console.error(`Admin ${action} error:`, err.message);
@@ -160,4 +162,57 @@ async function addAthlete(admin, { firstName, lastName, weight, grade, school, g
     warnings: warnings.length ? warnings : undefined,
     message: `${firstName.trim()} ${lastName.trim()} added to ${group}.${warnings.length ? ' Some parent invites failed — check warnings.' : ''}`,
   };
+}
+
+// ── listMembers ───────────────────────────────────────────────────────────────
+// Returns all profiles (coaches, parents, admins) for a team, enriched with
+// invite status (pending = never signed in) from auth.users.
+
+async function listMembers(admin, teamId) {
+  const [{ data: profiles, error: profErr }, { data: { users }, error: authErr }] = await Promise.all([
+    admin
+      .from('profiles')
+      .select('id, full_name, email, role, created_at')
+      .eq('team_id', teamId)
+      .order('full_name'),
+    admin.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
+
+  if (profErr) throw new Error(`listMembers profiles: ${profErr.message}`);
+  if (authErr) throw new Error(`listMembers auth: ${authErr.message}`);
+
+  const authMap = new Map((users ?? []).map(u => [u.id, u]));
+
+  return {
+    members: (profiles ?? []).map(p => {
+      const au = authMap.get(p.id);
+      return {
+        id:        p.id,
+        name:      p.full_name,
+        email:     p.email,
+        role:      p.role,
+        status:    au?.last_sign_in_at ? 'active' : 'pending',
+        createdAt: p.created_at,
+      };
+    }),
+  };
+}
+
+// ── setUserRole ───────────────────────────────────────────────────────────────
+// Promotes or demotes a team member. Scoped to the team so a rogue caller
+// cannot modify users on another team.
+
+async function setUserRole(admin, { userId, role } = {}, teamId) {
+  if (!userId) throw new Error('userId is required');
+  const VALID_ROLES = ['coach', 'parent', 'admin'];
+  if (!VALID_ROLES.includes(role)) throw new Error(`Invalid role "${role}"`);
+
+  const { error } = await admin
+    .from('profiles')
+    .update({ role })
+    .eq('id', userId)
+    .eq('team_id', teamId);
+
+  if (error) throw new Error(`setUserRole: ${error.message}`);
+  return { success: true };
 }
