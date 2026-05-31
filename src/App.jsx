@@ -64,6 +64,13 @@ export default function App() {
   const auth = useAuth();
   const { teamBranding, loading: brandingLoading, notFound } = useTeamResolver();
   const { pullY, released, threshold } = usePullToRefresh();
+  const [updateReady, setUpdateReady] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setUpdateReady(true);
+    window.addEventListener('pwa-updated', handler);
+    return () => window.removeEventListener('pwa-updated', handler);
+  }, []);
 
   // Super admin team-switching: when a super admin visits a subdomain whose
   // team differs from their profile's current team_id, silently update the DB
@@ -151,6 +158,42 @@ export default function App() {
 
   return (
     <>
+      {/* Update available banner — tap to reload at a convenient time */}
+      {updateReady && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9998,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          background: '#1B3A5C', pointerEvents: 'auto',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 16px', width: '100%', maxWidth: 430,
+          }}>
+            <span style={{ fontSize: 16 }}>🔄</span>
+            <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#fff', margin: 0 }}>
+              Update available
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '6px 14px', borderRadius: 8, border: 'none',
+                background: '#6BADE4', color: '#fff',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              Refresh
+            </button>
+            <button
+              onClick={() => setUpdateReady(false)}
+              style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Pull-to-refresh indicator — floats above the app, visible only while pulling */}
       {showIndicator && (
         <div style={{

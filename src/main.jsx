@@ -3,17 +3,16 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/global.css';
 
-// ── PWA auto-update ───────────────────────────────────────────────────────────
-// When the service worker updates and takes control (controllerchange), reload
-// the page so the app picks up the new precached JS/CSS bundle. This is what
-// makes "autoUpdate" mode actually work in standalone / home-screen installs
-// where the user never fully closes the app.
+// ── PWA update detection ──────────────────────────────────────────────────────
+// When a new service worker takes control, dispatch a custom event so the app
+// can show a non-intrusive "Update available" banner instead of auto-reloading
+// mid-session. The user taps the banner when they're ready to refresh.
 if ('serviceWorker' in navigator) {
-  let refreshing = false;
+  let notified = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true;
-      window.location.reload();
+    if (!notified) {
+      notified = true;
+      window.dispatchEvent(new Event('pwa-updated'));
     }
   });
 }
