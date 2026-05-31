@@ -321,6 +321,8 @@ export default function ChannelThread({
       setAiMsgs(prev => [...prev, userMsg]);
       setTyping(true);
 
+      try {
+
       // ── 1. Get Claude's response (it includes structured intents when needed) ──
       const resp = await sendToMatMind(
         text,
@@ -368,7 +370,17 @@ export default function ChannelThread({
       }
 
       setAiMsgs(prev => [...prev, aiMsg]);
-      setTyping(false);
+
+      } catch (err) {
+        console.error('MatMind: handleSend error:', err);
+        setAiMsgs(prev => [...prev, {
+          id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', time: 'Now',
+          text: 'Something went wrong on my end. Please try again.',
+        }]);
+      } finally {
+        setTyping(false);
+      }
+
     } else {
       onSendMessage(channel.id, text, attachments);
     }

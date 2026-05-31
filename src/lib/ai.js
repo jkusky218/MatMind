@@ -10,9 +10,15 @@ const AI_ENDPOINT = '/api/chat';
  * @returns {Promise<{text: string, actions: string[], followUp: string|null}>}
  */
 export async function sendToMatMind(message, context = {}, history = []) {
+  // 25-second timeout — Vercel hobby functions time out at 10s, pro at 60s.
+  // Without this, a hung connection spins the typing indicator forever.
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 25000);
+
   try {
     const response = await fetch(AI_ENDPOINT, {
       method: 'POST',
+      signal: controller.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message,
@@ -51,13 +57,18 @@ export async function sendToMatMind(message, context = {}, history = []) {
       error: false,
     };
   } catch (error) {
-    console.error('MatMind AI network error:', error);
+    const isTimeout = error.name === 'AbortError';
+    console.error('MatMind AI error:', isTimeout ? 'request timed out' : error);
     return {
-      text: "I can't reach the AI service right now. Check your connection and try again.",
+      text: isTimeout
+        ? "The AI is taking too long to respond. Try a shorter message or try again in a moment."
+        : "I can't reach the AI service right now. Check your connection and try again.",
       actions: [],
       followUp: null,
       error: true,
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
