@@ -71,13 +71,15 @@ function normalizeMessage(m) {
   const d = new Date(m.created_at);
   const time = d.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
   return {
-    id: m.id,
-    sender: m.sender_name,
-    role: m.is_ai ? 'ai' : m.sender_role,
-    text: m.content,
+    id:         m.id,
+    sender:     m.sender_name,
+    senderId:   m.sender_id ?? null,
+    role:       m.is_ai ? 'ai' : m.sender_role,
+    text:       m.content,
     time,
-    pinned: m.is_pinned ?? false,
+    pinned:     m.is_pinned ?? false,
     attachments: Array.isArray(m.attachments) ? m.attachments : null,
+    editedAt:   m.edited_at ?? null,
   };
 }
 
@@ -255,7 +257,7 @@ export function useTeamData(auth) {
       if (channelUUIDs.length > 0) {
         const { data: msgRows } = await supabase
           .from('messages')
-          .select('id, channel_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, created_at')
+          .select('id, channel_id, sender_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, edited_at, created_at')
           .in('channel_id', channelUUIDs)
           .order('created_at', { ascending: true });
 
@@ -284,11 +286,32 @@ export function useTeamData(auth) {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
           const slug = idToSlug.current[payload.new.channel_id];
           if (!slug) return;
-          const msg = normalizeMessage(payload.new);
           setChannelMessages(prev => ({
             ...prev,
-            [slug]: [...(prev[slug] ?? []), msg],
+            [slug]: [...(prev[slug] ?? []), normalizeMessage(payload.new)],
           }));
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
+          const slug = idToSlug.current[payload.new.channel_id];
+          if (!slug) return;
+          setChannelMessages(prev => ({
+            ...prev,
+            [slug]: (prev[slug] ?? []).map(m =>
+              m.id === payload.new.id ? normalizeMessage(payload.new) : m
+            ),
+          }));
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
+          // REPLICA IDENTITY FULL ensures payload.old contains the full row
+          const deletedId = payload.old?.id;
+          if (!deletedId) return;
+          setChannelMessages(prev => {
+            const next = {};
+            for (const [slug, msgs] of Object.entries(prev)) {
+              next[slug] = msgs.filter(m => m.id !== deletedId);
+            }
+            return next;
+          });
         })
         .subscribe();
     }
@@ -399,6 +422,60 @@ export function useTeamData(auth) {
     }
     return { ok: true };
   }, [auth]);
+
+  // ── editMessage ──────────────────────────────────────────────────────────────
+  const editMessage = useCallback(async (messageId, channelSlug, newText) => {
+    if (!messageId || !newText?.trim()) return;
+    const now = new Date().toISOString();
+
+    // Optimistic update
+    setChannelMessages(prev => ({
+      ...prev,
+      [channelSlug]: (prev[channelSlug] ?? []).map(m =>
+        m.id === messageId ? { ...m, text: newText.trim(), editedAt: now } : m
+      ),
+    }));
+
+    if (isDemo || !supabase) return { ok: true };
+
+    const { error } = await supabase
+      .from('messages')
+      .update({ content: newText.trim(), edited_at: now })
+      .eq('id', messageId);
+
+    if (error) {
+      console.error('MatMind: edit message failed', error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  }, []);
+
+  // ── deleteMessage ─────────────────────────────────────────────────────────────
+  const deleteMessage = useCallback(async (messageId) => {
+    if (!messageId) return;
+
+    // Optimistic remove across all channels
+    setChannelMessages(prev => {
+      const next = {};
+      for (const [slug, msgs] of Object.entries(prev)) {
+        next[slug] = msgs.filter(m => m.id !== messageId);
+      }
+      return next;
+    });
+
+    if (isDemo || !supabase) return { ok: true };
+
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (error) {
+      console.error('MatMind: delete message failed', error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  }, []);
 
   // ── sendAIMessage ────────────────────────────────────────────────────────────
   // Posts a MatMind AI response to a group channel. Called after the AI
@@ -514,6 +591,8 @@ export function useTeamData(auth) {
     channelMessages,
     sendMessage,
     sendAIMessage,
+    editMessage,
+    deleteMessage,
     createEvent,
     updateAvailabilityEntry,
     loading,

@@ -274,6 +274,9 @@ export default function ChannelThread({
   onBack,
   onSendMessage,
   onSendAIMessage,
+  onEditMessage,
+  onDeleteMessage,
+  currentUserId,
   roster, events, availability, attendance, kbEntries,
   setRoster, setEvents, setAvailability,
   createEvent,
@@ -300,6 +303,9 @@ export default function ChannelThread({
   const [input,           setInput]           = useState('');
   const [typing,          setTyping]          = useState(false);
   const [channelAITyping, setChannelAITyping] = useState(false); // AI thinking in group channel
+  const [selectedMsgId,   setSelectedMsgId]   = useState(null);  // tapped message for edit/delete
+
+  const canModerate = userRole === 'coach' || userRole === 'admin';
   const [pendingFile,     setPendingFile]      = useState(null);  // { url, name, type, size }
   const [uploading,       setUploading]        = useState(false);
   const scrollRef   = useRef(null);
@@ -483,8 +489,19 @@ export default function ChannelThread({
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', WebkitOverflowScrolling: 'touch' }}>
-        {displayMsgs.map(m => <ChatBubble key={m.id} msg={m} isUser={false} />)}
+      <div ref={scrollRef} onClick={() => setSelectedMsgId(null)} style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', WebkitOverflowScrolling: 'touch' }}>
+        {displayMsgs.map(m => (
+          <ChatBubble
+            key={m.id}
+            msg={m}
+            isOwn={!!currentUserId && m.senderId === currentUserId}
+            canModerate={canModerate}
+            selected={selectedMsgId === m.id}
+            onSelect={setSelectedMsgId}
+            onSaveEdit={(id, newText) => onEditMessage?.(id, channel.id, newText)}
+            onDelete={(id) => onDeleteMessage?.(id)}
+          />
+        ))}
 
         {/* AI typing indicator — AI channel uses `typing`, group channels use `channelAITyping` */}
         {(typing || channelAITyping) && (

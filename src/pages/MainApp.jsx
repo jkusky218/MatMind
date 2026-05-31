@@ -34,7 +34,7 @@ export default function MainApp({ auth }) {
     events, setEvents,
     availability, setAvailability,
     attendance, recordAttendance,
-    channelMessages, sendMessage, sendAIMessage,
+    channelMessages, sendMessage, sendAIMessage, editMessage, deleteMessage,
     createEvent, updateAvailabilityEntry,
     loading, isDemo,
   } = useTeamData(auth);
@@ -198,6 +198,9 @@ export default function MainApp({ auth }) {
             onBack={() => setActiveChannel(null)}
             onSendMessage={sendMessage}
             onSendAIMessage={sendAIMessage}
+            onEditMessage={editMessage}
+            onDeleteMessage={deleteMessage}
+            currentUserId={auth.user?.id}
             roster={roster}
             events={events}
             availability={availability}
