@@ -70,17 +70,21 @@ export function useAuth() {
 
   // switchTeam — super admins call this when visiting a different subdomain.
   // Updates the profile's team_id in the DB so Supabase RLS scopes queries correctly.
+  const [switching, setSwitching] = useState(false);
+
   const switchTeam = useCallback(async (newTeamId) => {
     if (!user?.id || isDemo || !supabase || !newTeamId) return;
+    setSwitching(true);
     const { error } = await supabase
       .from('profiles')
       .update({ team_id: newTeamId })
       .eq('id', user.id);
     if (error) {
       console.error('MatMind: switchTeam failed', error.message);
-      return;
+    } else {
+      setProfile(prev => prev ? { ...prev, team_id: newTeamId } : prev);
     }
-    setProfile(prev => prev ? { ...prev, team_id: newTeamId } : prev);
+    setSwitching(false);
   }, [user?.id]);
 
   const signIn = useCallback(async (email, password, role) => {
@@ -126,6 +130,7 @@ export function useAuth() {
     user,
     profile,
     loading,
+    switching,
     signIn,
     signUp,
     signOut,

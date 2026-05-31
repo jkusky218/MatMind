@@ -108,8 +108,8 @@ export default function App() {
     );
   }
 
-  // ── Loading spinner (auth or branding) ─────────────────────────────────────
-  if (auth.loading || brandingLoading) {
+  // ── Loading spinner (auth, branding, or super-admin team switch) ───────────
+  if (auth.loading || brandingLoading || auth.switching) {
     return (
       <div style={{
         height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -303,7 +303,7 @@ export function useTeamData(auth) {
     const normalized = { id: tempId, title, type, date, time, location, groups };
     setEvents(prev => [...prev, normalized]);
 
-    if (isDemo || !supabase || !teamId) return;
+    if (isDemo || !supabase || !teamId) return { ok: true }; // demo/offline: optimistic only
 
     // Convert any common time string → "HH:MM:00" for Postgres TIME column.
     // Falls back to 18:00:00 (6 PM) rather than null to satisfy the NOT NULL constraint.

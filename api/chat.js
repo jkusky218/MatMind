@@ -17,6 +17,10 @@ export default async function handler(req, res) {
 
   const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName, gymName });
 
+  // Only coaches/admins get the scheduling and posting tools.
+  // Parents receive Q&A responses only — no tool access.
+  const isCoach = userRole === 'coach' || userRole === 'admin';
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -26,12 +30,9 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-2024-07-31',
       },
-      const isCoach = userRole === 'coach' || userRole === 'admin';
-
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
-        // Only give coaches the schedule/posting tools — parents get Q&A only
         ...(isCoach ? {
           tools: [buildScheduleTool(teamName), buildPostMessageTool()],
           tool_choice: { type: 'auto' },
