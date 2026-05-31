@@ -326,6 +326,7 @@ export default function MainApp({ auth }) {
             senderName={auth.profile?.full_name}
             userRole={auth.profile?.role ?? 'coach'}
             teamSettings={teamSettings}
+            teamId={auth.profile?.team_id}
           />
         ) : (
           <>

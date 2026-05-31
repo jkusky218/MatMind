@@ -77,6 +77,7 @@ function normalizeMessage(m) {
     text: m.content,
     time,
     pinned: m.is_pinned ?? false,
+    attachments: Array.isArray(m.attachments) ? m.attachments : null,
   };
 }
 
@@ -254,7 +255,7 @@ export function useTeamData(auth) {
       if (channelUUIDs.length > 0) {
         const { data: msgRows } = await supabase
           .from('messages')
-          .select('id, channel_id, sender_name, sender_role, is_ai, content, is_pinned, created_at')
+          .select('id, channel_id, sender_name, sender_role, is_ai, content, is_pinned, attachments, created_at')
           .in('channel_id', channelUUIDs)
           .order('created_at', { ascending: true });
 
@@ -400,7 +401,7 @@ export function useTeamData(auth) {
   }, [auth]);
 
   // ── sendMessage ─────────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (channelSlug, text) => {
+  const sendMessage = useCallback(async (channelSlug, text, attachments = null) => {
     const senderName = auth.profile?.full_name ?? 'Coach';
     const senderRole = auth.profile?.role ?? 'coach';
     const newMsg = {
@@ -410,6 +411,7 @@ export function useTeamData(auth) {
       text,
       time: 'Now',
       pinned: false,
+      attachments: attachments ?? null,
     };
 
     if (isDemo || !supabase) {
@@ -431,6 +433,7 @@ export function useTeamData(auth) {
       content: text,
       is_ai: false,
       is_pinned: false,
+      attachments: attachments?.length ? attachments : null,
     });
     // Realtime subscription handles adding msg to state
   }, [auth]);

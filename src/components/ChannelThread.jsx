@@ -3,6 +3,8 @@ import { BRAND, GROUP_LABELS, GROUPS } from '../lib/constants';
 import { Brain, Send, ChevLeft, Lock, ICON_MAP } from './Icons';
 import ChatBubble from './ChatBubble';
 import { sendToMatMind } from '../lib/ai';
+import { uploadChannelFile } from '../lib/storage';
+import { isDemo } from '../lib/supabase';
 
 // ── Claude intent execution ───────────────────────────────────────────────────
 // After Claude responds, it may include a structured intents array.
@@ -261,6 +263,7 @@ export default function ChannelThread({
   senderName,
   userRole,
   teamSettings = {},
+  teamId,
 }) {
   const teamName = teamSettings.teamName || 'Team';
   const gymName  = teamSettings.gymName  || 'Team Gym';
@@ -273,12 +276,17 @@ export default function ChannelThread({
     time: 'Now',
   };
 
-  const [aiMsgs,  setAiMsgs]  = useState([greeting]);
-  const [history, setHistory] = useState([]);
-  const [input,   setInput]   = useState('');
-  const [typing,  setTyping]  = useState(false);
-  const scrollRef             = useRef(null);
-  const inputRef              = useRef(null);
+  const [aiMsgs,          setAiMsgs]          = useState([greeting]);
+  const [history,         setHistory]         = useState([]);
+  const [input,           setInput]           = useState('');
+  const [typing,          setTyping]          = useState(false);
+  const [pendingFile,     setPendingFile]      = useState(null);  // { url, name, type, size }
+  const [uploading,       setUploading]        = useState(false);
+  const scrollRef   = useRef(null);
+  const inputRef    = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const canAttach = !isAI && !isDemo; // no attachments in AI channel or demo mode
 
   const displayMsgs = isAI ? aiMsgs : messages;
 
@@ -286,10 +294,26 @@ export default function ChannelThread({
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [displayMsgs, typing]);
 
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ''; // reset so same file can be re-selected
+    setUploading(true);
+    try {
+      const attachment = await uploadChannelFile(file, teamId);
+      setPendingFile(attachment);
+    } catch (err) {
+      alert(err.message);
+    }
+    setUploading(false);
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || typing) return;
+    if ((!input.trim() && !pendingFile) || typing) return;
     const text = input.trim();
+    const attachments = pendingFile ? [pendingFile] : null;
     setInput('');
+    setPendingFile(null);
 
     if (isAI) {
       const userMsg = { id: Date.now(), sender: senderName ?? 'Coach', role: 'coach', text, time: 'Now' };
@@ -345,7 +369,7 @@ export default function ChannelThread({
       setAiMsgs(prev => [...prev, aiMsg]);
       setTyping(false);
     } else {
-      onSendMessage(channel.id, text);
+      onSendMessage(channel.id, text, attachments);
     }
   };
 
@@ -411,8 +435,67 @@ export default function ChannelThread({
         )}
       </div>
 
-      {/* Input */}
+      {/* Hidden file input */}
+      {canAttach && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,application/pdf"
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
+        />
+      )}
+
+      {/* Attachment preview strip */}
+      {(pendingFile || uploading) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '8px 14px', borderTop: '1px solid #e8edf2', background: '#fafbfc',
+        }}>
+          {pendingFile?.type?.startsWith('image/') ? (
+            <img src={pendingFile.url} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
+          ) : (
+            <div style={{ width: 44, height: 44, borderRadius: 8, background: '#e8edf2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+              📄
+            </div>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a1a' }}>
+              {uploading ? 'Uploading…' : pendingFile?.name}
+            </p>
+            {!uploading && pendingFile && (
+              <p style={{ fontSize: 11, color: '#999', margin: 0 }}>
+                {(pendingFile.size / 1024).toFixed(0)} KB · ready to send
+              </p>
+            )}
+          </div>
+          {!uploading && (
+            <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#bbb', lineHeight: 1, flexShrink: 0 }}>
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Input row */}
       <div style={{ paddingTop: '8px', paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))', paddingLeft: '12px', paddingRight: '12px', borderTop: '1px solid #e8edf2', display: 'flex', gap: 8, alignItems: 'center', background: '#fff' }}>
+        {/* Attach button */}
+        {canAttach && (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            title="Attach image or PDF"
+            style={{
+              width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+              background: '#f0f4f8', border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: uploading ? 'default' : 'pointer', fontSize: 16,
+              opacity: uploading ? 0.5 : 1,
+            }}
+          >
+            📎
+          </button>
+        )}
         <input
           ref={inputRef}
           value={input}
@@ -422,12 +505,17 @@ export default function ChannelThread({
           placeholder={isAI ? 'Tell MatMind what you need...' : `Message #${channel.label}...`}
           style={{ flex: 1, background: '#f0f4f8', border: 'none', borderRadius: 20, padding: '10px 16px', fontSize: 14, outline: 'none', color: '#1a1a1a', opacity: typing ? 0.6 : 1 }}
         />
-        <button onClick={handleSend} disabled={typing || !input.trim()} style={{
-          width: 36, height: 36, borderRadius: '50%',
-          background: input.trim() && !typing ? BRAND.navy : '#ccd5de',
-          border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: input.trim() && !typing ? 'pointer' : 'default', transition: 'background 0.2s',
-        }}>
+        <button
+          onClick={handleSend}
+          disabled={typing || (!input.trim() && !pendingFile) || uploading}
+          style={{
+            width: 36, height: 36, borderRadius: '50%',
+            background: (input.trim() || pendingFile) && !typing && !uploading ? BRAND.navy : '#ccd5de',
+            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: (input.trim() || pendingFile) && !typing && !uploading ? 'pointer' : 'default',
+            transition: 'background 0.2s',
+          }}
+        >
           {Send(15, '#fff')}
         </button>
       </div>
