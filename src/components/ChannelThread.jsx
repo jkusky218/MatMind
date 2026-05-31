@@ -22,15 +22,20 @@ async function executeClaudeIntents(intents, { createEvent, updateAvailabilityEn
         errors.push(`Skipped "${intent.title}": missing or invalid date (got "${intent.date}")`);
         continue;
       }
-      const group = VALID_GROUPS.has(intent.group) ? intent.group : 'all';
-      console.log('[MatMind] Claude intent → create_event:', intent.title, intent.date, intent.time, group);
+      // Support both new groups[] array and legacy group string from older intents
+      const groups = Array.isArray(intent.groups) && intent.groups.length
+        ? intent.groups.filter(g => VALID_GROUPS.has(g) && g !== 'all')
+        : intent.group && VALID_GROUPS.has(intent.group) && intent.group !== 'all'
+          ? [intent.group]
+          : null;
+      console.log('[MatMind] Claude intent → create_event:', intent.title, intent.date, intent.time, groups);
       const result = await createEvent({
         title: intent.title || 'Practice',
         type: intent.eventType || 'practice',
         date: intent.date,
         time: intent.time || '6:00 PM',
-        location: intent.location || gymName,
-        group,
+        location: intent.location,
+        groups,
       });
       if (result?.ok === false) {
         errors.push(`"${intent.title}" (${intent.date}): ${result.error}`);
@@ -102,7 +107,8 @@ async function executeIntents(message, { roster, events, createEvent, updateAvai
   if (isAddEvent && createEvent) {
     const dayMatch  = lower.match(/(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
     const timeMatch = lower.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i);
-    const group     = detectGroup(lower) ?? 'all';
+    const groupStr  = detectGroup(lower);
+    const groups    = groupStr ? [groupStr] : null;
     const day       = dayMatch ? dayMatch[1].charAt(0).toUpperCase() + dayMatch[1].slice(1) : 'Thursday';
     const timeRaw   = timeMatch ? timeMatch[1] : '6:00 PM';
     // Normalise "6pm" / "6 PM" → "6:00 PM"
@@ -112,8 +118,8 @@ async function executeIntents(message, { roster, events, createEvent, updateAvai
       .replace(/(\d+:\d+)\s*(am|pm)/i, (_, t, ap) => `${t} ${ap.toUpperCase()}`);
     const date  = dayMatch ? getNextWeekdayDate(day) : localDateStr(new Date());
     const label = day === 'Tomorrow' ? 'Practice' : `${day} Practice`;
-    console.log('[MatMind] createEvent:', { label, date, time, group });
-    const result = await createEvent({ title: label, type: 'practice', date, time, location: gymName, group });
+    console.log('[MatMind] createEvent:', { label, date, time, groups });
+    const result = await createEvent({ title: label, type: 'practice', date, time, location: gymName, groups });
     if (result?.ok === false) {
       errors.push(`Could not save ${label} to the database: ${result.error}`);
     } else {

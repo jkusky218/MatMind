@@ -37,7 +37,7 @@ function formatDate(ds) {
 
 function AvailabilitySection({ event, availability, athletes }) {
   const suffix    = `-${event.id}`;
-  const eligible  = event.group === 'all' ? athletes : athletes.filter(r => r.group === event.group);
+  const eligible  = event.groups === null ? athletes : athletes.filter(r => event.groups.includes(r.group));
   const confirmed = Object.entries(availability).filter(([k, v]) => k.endsWith(suffix) && v === 'confirmed').length;
   const declined  = Object.entries(availability).filter(([k, v]) => k.endsWith(suffix) && v === 'declined').length;
   const total     = eligible.length;
@@ -73,7 +73,7 @@ function AvailabilitySection({ event, availability, athletes }) {
 function AttendanceSection({ event, attendance, recordAttendance, athletes }) {
   const [open, setOpen] = useState(false);
 
-  const eligible  = event.group === 'all' ? athletes : athletes.filter(r => r.group === event.group);
+  const eligible  = event.groups === null ? athletes : athletes.filter(r => event.groups.includes(r.group));
   const suffix    = `-${event.id}`;
   const present   = Object.entries(attendance).filter(([k, v]) => k.endsWith(suffix) && v === 'present').length;
   const absent    = Object.entries(attendance).filter(([k, v]) => k.endsWith(suffix) && v === 'absent').length;
@@ -253,11 +253,11 @@ function EventCard({ ev, availability, attendance, recordAttendance, athletes, i
             <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: ts.bg, color: ts.color, textTransform: 'uppercase', letterSpacing: 0.5 }}>
               {ts.label}
             </span>
-            {ev.group !== 'all' && (
-              <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: (GROUP_COLORS[ev.group] ?? '#888') + '18', color: GROUP_COLORS[ev.group] ?? '#888', textTransform: 'uppercase' }}>
-                {GROUP_LABELS[ev.group] ?? ev.group}
+            {ev.groups !== null && ev.groups.map(g => (
+              <span key={g} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: (GROUP_COLORS[g] ?? '#888') + '18', color: GROUP_COLORS[g] ?? '#888', textTransform: 'uppercase' }}>
+                {GROUP_LABELS[g] ?? g}
               </span>
-            )}
+            ))}
           </div>
           <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>{ev.title}</p>
           <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#888' }}>
@@ -307,10 +307,10 @@ export default function ScheduleTab({ events, availability, attendance = {}, rec
         ? COMPETITION_TYPES.has(ev.type)
         : !COMPETITION_TYPES.has(ev.type);
 
-    // Group: show event if it targets the selected group OR is open to all groups
+    // Group: show event if it targets the selected group OR is open to all groups (null)
     const groupMatch = groupFilter === 'all'
       ? true
-      : ev.group === groupFilter || ev.group === 'all';
+      : ev.groups === null || ev.groups.includes(groupFilter);
 
     return typeMatch && groupMatch;
   });

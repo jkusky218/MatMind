@@ -71,7 +71,7 @@ export default async function handler(req, res) {
           date: e.date,
           time: e.time,
           location: e.location || gymName,
-          group: e.group || 'all',
+          groups: Array.isArray(e.groups) ? e.groups.filter(g => g && g !== 'all') : [],
           eventType: e.eventType || 'practice',
         }));
         intents.push(...newIntents);
@@ -90,10 +90,10 @@ export default async function handler(req, res) {
       const postIntents  = intents.filter(i => i.type === 'post_message');
 
       if (eventIntents.length > 0) {
-        const groups = [...new Set(eventIntents.map(i => i.group).filter(g => g && g !== 'all'))];
-        aiText = `Done! I've added **${eventIntents.length} practice session${eventIntents.length !== 1 ? 's' : ''}** to the schedule`;
-        if (groups.length > 1)      aiText += ` (${groups.join(' + ')})`;
-        else if (groups.length === 1) aiText += ` for the ${groups[0]} group`;
+        const allGroups = [...new Set(eventIntents.flatMap(i => i.groups ?? []))];
+        aiText = `Done! I've added **${eventIntents.length} event${eventIntents.length !== 1 ? 's' : ''}** to the schedule`;
+        if (allGroups.length > 1)      aiText += ` (${allGroups.join(' + ')})`;
+        else if (allGroups.length === 1) aiText += ` for the ${allGroups[0]} group`;
         aiText += '.';
       }
       if (postIntents.length > 0) {
@@ -158,7 +158,7 @@ function buildScheduleTool(teamName = 'the team') {
       `Add one or more events to the ${teamName} schedule. ` +
       'Call this whenever the coach asks to create, add, or schedule any practice, match, tournament, or other event. ' +
       'For recurring events (e.g. "every Monday in June") include one object per occurrence with exact YYYY-MM-DD dates. ' +
-      'For events targeting multiple groups (e.g. "Beginner and Advanced") include a separate object per group per date.',
+      'For recurring events (e.g. "every Monday in June") include one object per date. For events targeting multiple groups set groups to an array, e.g. ["beginner","advanced"].',
     input_schema: {
       type: 'object',
       required: ['events'],
@@ -168,16 +168,16 @@ function buildScheduleTool(teamName = 'the team') {
           description: 'List of individual event occurrences to create.',
           items: {
             type: 'object',
-            required: ['title', 'date', 'time', 'group'],
+            required: ['title', 'date', 'time'],
             properties: {
               title:     { type: 'string', description: 'Event title, e.g. "Monday Practice"' },
               date:      { type: 'string', description: 'Exact date in YYYY-MM-DD format. Always calculate from today\'s date.' },
               time:      { type: 'string', description: 'Start time, e.g. "6:30 PM" or "18:30"' },
               location:  { type: 'string', description: 'Location name, e.g. "Murray Athletic Center"' },
-              group: {
-                type: 'string',
-                enum: ['all', 'advanced', 'beginner', 'tots', 'coaches'],
-                description: 'Roster group. Use "all" if no group specified. For multiple groups make separate entries.',
+              groups: {
+                type: 'array',
+                items: { type: 'string', enum: ['advanced', 'beginner', 'tots', 'coaches'] },
+                description: 'Roster groups for this event. Omit or leave empty for all groups. Use multiple values for cross-group events, e.g. ["beginner","advanced"].',
               },
               eventType: {
                 type: 'string',

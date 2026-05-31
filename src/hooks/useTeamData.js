@@ -50,6 +50,12 @@ function formatTime(timeStr) {
 }
 
 function normalizeEvent(e) {
+  // roster_groups (array, new) takes priority over roster_group (single, legacy)
+  const groups = e.roster_groups?.length
+    ? e.roster_groups
+    : e.roster_group
+      ? [e.roster_group]
+      : null; // null = all groups
   return {
     id: e.id,
     title: e.title,
@@ -57,7 +63,7 @@ function normalizeEvent(e) {
     date: e.event_date,
     time: formatTime(e.start_time),
     location: e.location_name ?? '',
-    group: e.roster_group ?? 'all',
+    groups, // string[] | null
   };
 }
 
@@ -109,7 +115,11 @@ export function useTeamData(auth) {
   useEffect(() => {
     if (!isDemo) return;
     setRoster(INITIAL_ROSTER);
-    setEvents(INITIAL_EVENTS);
+    // Normalise mock events to the groups array format
+    setEvents(INITIAL_EVENTS.map(e => ({
+      ...e,
+      groups: e.group === 'all' || !e.group ? null : [e.group],
+    })));
     setAvailability(INITIAL_AVAILABILITY);
     setAttendance({});          // no prior attendance in demo — coach takes it live
     setChannelMessages(INITIAL_CHANNEL_MESSAGES);
@@ -184,7 +194,7 @@ export function useTeamData(auth) {
       const today = new Date().toISOString().slice(0, 10);
       const { data: eventRows } = await supabase
         .from('events')
-        .select('id, title, event_type, event_date, start_time, location_name, roster_group')
+        .select('id, title, event_type, event_date, start_time, location_name, roster_group, roster_groups')
         .eq('team_id', teamId)
         .gte('event_date', today)
         .order('event_date', { ascending: true })
@@ -287,9 +297,9 @@ export function useTeamData(auth) {
   }, [teamId]);
 
   // ── createEvent ─────────────────────────────────────────────────────────────
-  const createEvent = useCallback(async ({ title, type = 'practice', date, time, location = '', group = 'all' }) => {
+  const createEvent = useCallback(async ({ title, type = 'practice', date, time, location = '', groups = null }) => {
     const tempId = `local-${Date.now()}`;
-    const normalized = { id: tempId, title, type, date, time, location, group };
+    const normalized = { id: tempId, title, type, date, time, location, groups };
     setEvents(prev => [...prev, normalized]);
 
     if (isDemo || !supabase || !teamId) return;
@@ -326,7 +336,8 @@ export function useTeamData(auth) {
       event_date: date,
       start_time: toSQLTime(time),
       location_name: location,
-      roster_group: group === 'all' ? null : group,
+      roster_groups: groups?.length ? groups : null,
+      roster_group: groups?.length === 1 ? groups[0] : null, // legacy column, kept for compat
       created_by: auth.user?.id ?? null,
     }).select('id').single();
 
