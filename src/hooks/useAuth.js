@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isDemo } from '../lib/supabase';
 
 const DEMO_USERS = {
@@ -24,6 +24,13 @@ export function useAuth() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading,      setLoading]      = useState(true);
 
+  // Tracks the user id we've already loaded a profile for. Supabase fires
+  // onAuthStateChange on every tab refocus, token refresh, and realtime
+  // reconnect — re-fetching the profile each time churns state and (for super
+  // admins) re-triggers team switching, which wipes in-memory channel history.
+  // We ignore repeat events for an already-loaded user.
+  const handledUserId = useRef(null);
+
   useEffect(() => {
     if (isDemo) {
       setLoading(false);
@@ -32,6 +39,8 @@ export function useAuth() {
 
     // Check existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      const id = session?.user?.id ?? null;
+      handledUserId.current = id;
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
       else setLoading(false);
@@ -40,10 +49,18 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        const newId = session?.user?.id ?? null;
+
+        // Skip repeat events for the same already-loaded user. Only act on a
+        // genuine change: a different user signing in, or a sign-out (null).
+        if (newId && newId === handledUserId.current) return;
+
+        handledUserId.current = newId;
         setUser(session?.user ?? null);
         if (session?.user) fetchProfile(session.user.id);
         else {
           setProfile(null);
+          setIsSuperAdmin(false);
           setLoading(false);
         }
       }
