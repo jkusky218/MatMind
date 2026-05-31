@@ -138,10 +138,13 @@ export default function MainApp({ auth }) {
         }}>
           <div style={{
             width: 34, height: 34, borderRadius: '50%',
-            background: 'rgba(107,173,228,0.15)', border: '1px solid rgba(107,173,228,0.25)',
+            background: teamSettings.logoUrl ? '#fff' : 'rgba(107,173,228,0.15)',
+            border: '1px solid rgba(107,173,228,0.25)', overflow: 'hidden',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            {Brain(20, BRAND.columbia)}
+            {teamSettings.logoUrl
+              ? <img src={teamSettings.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              : Brain(20, BRAND.columbia)}
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ fontWeight: 700, fontSize: 16, color: '#fff', margin: 0, letterSpacing: -0.3 }}>MatMind</p>

@@ -35,6 +35,7 @@ export default function LoginScreen({ auth, teamBranding }) {
   const secondaryColor = teamBranding?.secondaryColor || '#6BADE4';
   const teamName       = teamBranding?.teamName       || null;
   const mascot         = teamBranding?.mascot         || '';
+  const logoUrl        = teamBranding?.logoUrl        || null;
 
   // Darken the primary color slightly for the gradient top
   const gradientTop = primaryColor.replace(/^#/, '');
@@ -50,9 +51,16 @@ export default function LoginScreen({ auth, teamBranding }) {
       {/* Team branding — shown when arriving via subdomain */}
       {teamName ? (
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          {mascot && <p style={{ fontSize: 40, marginBottom: 8 }}>
-            {mascot === 'Lions' ? '🦁' : mascot === 'Warriors' ? '⚔️' : mascot === 'Eagles' ? '🦅' : '🏆'}
-          </p>}
+          {logoUrl ? (
+            <img src={logoUrl} alt={teamName} style={{
+              width: 72, height: 72, objectFit: 'contain', marginBottom: 12,
+              borderRadius: 14, background: 'rgba(255,255,255,0.95)', padding: 6,
+            }} />
+          ) : mascot ? (
+            <p style={{ fontSize: 40, marginBottom: 8 }}>
+              {mascot === 'Lions' ? '🦁' : mascot === 'Warriors' ? '⚔️' : mascot === 'Eagles' ? '🦅' : '🏆'}
+            </p>
+          ) : null}
           <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', marginBottom: 4, letterSpacing: -0.5 }}>
             {teamName}
           </h1>

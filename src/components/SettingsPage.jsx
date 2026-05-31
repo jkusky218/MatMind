@@ -2,9 +2,10 @@
 // All users:  Account info, personal notification prefs (Soon)
 // Admin only: Team Branding, Roster Groups, Member Management
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { BRAND, GROUPS, GROUP_LABELS, GROUP_COLORS } from '../lib/constants';
 import { ChevLeft, Shield, Plus, Trash } from './Icons';
+import { uploadTeamLogo } from '../lib/storage';
 
 // ── Shared UI primitives ──────────────────────────────────────────────────────
 
@@ -680,6 +681,78 @@ function TestNotifButton({ teamId, userId }) {
   );
 }
 
+// ── Logo Uploader ─────────────────────────────────────────────────────────────
+
+function LogoUploader({ logoUrl, teamId, onSave }) {
+  const [busy,  setBusy]  = useState(false);
+  const [error, setError] = useState(null);
+  const inputRef = useRef(null);
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true); setError(null);
+    try {
+      const url = await uploadTeamLogo(file, teamId);
+      await onSave({ logoUrl: url });
+    } catch (err) {
+      setError(err.message);
+    }
+    setBusy(false);
+  }
+
+  async function handleRemove() {
+    setBusy(true); setError(null);
+    await onSave({ logoUrl: null });
+    setBusy(false);
+  }
+
+  return (
+    <div style={{ padding: '13px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Preview */}
+        <div style={{
+          width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+          background: logoUrl ? '#fff' : '#f0f2f5', border: '1px solid #e6eaef',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+        }}>
+          {logoUrl
+            ? <img src={logoUrl} alt="Team logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            : <span style={{ fontSize: 20 }}>🖼️</span>}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 12, color: '#8a96a3', margin: '0 0 1px', fontWeight: 500 }}>Team Logo</p>
+          <p style={{ fontSize: 13, color: '#1a1a1a', margin: 0 }}>
+            {logoUrl ? 'Shown on login & header' : 'PNG, JPG, or SVG · up to 2 MB'}
+          </p>
+        </div>
+
+        <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+          style={{ display: 'none' }} onChange={handleFile} />
+
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          {logoUrl && !busy && (
+            <button onClick={handleRemove} style={{
+              fontSize: 12, fontWeight: 600, borderRadius: 8, padding: '6px 10px',
+              border: '1px solid #fecaca', background: '#fff', color: '#dc2626', cursor: 'pointer',
+            }}>Remove</button>
+          )}
+          <button onClick={() => inputRef.current?.click()} disabled={busy} style={{
+            fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 12px',
+            border: 'none', background: busy ? '#ccd5de' : BRAND.navy, color: '#fff',
+            cursor: busy ? 'default' : 'pointer',
+          }}>
+            {busy ? 'Uploading…' : logoUrl ? 'Replace' : 'Upload'}
+          </button>
+        </div>
+      </div>
+      {error && <p style={{ color: '#dc2626', fontSize: 11, margin: '8px 0 0' }}>{error}</p>}
+    </div>
+  );
+}
+
 // ── Main SettingsPage ─────────────────────────────────────────────────────────
 
 export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings, onClose, push }) {
@@ -862,18 +935,7 @@ export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings
                 onSave={onUpdateSettings}
               />
               <Divider />
-              {/* Logo — deferred until Supabase Storage bucket is set up */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px' }}>
-                <span style={{ fontSize: 18, width: 32, textAlign: 'center' }}>🖼️</span>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 12, color: '#8a96a3', margin: '0 0 1px', fontWeight: 500 }}>Team Logo</p>
-                  <p style={{ fontSize: 13, color: '#b0b8c2', margin: 0 }}>Upload coming soon</p>
-                </div>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 8px',
-                  background: '#f0f2f5', color: '#8a96a3',
-                }}>Soon</span>
-              </div>
+              <LogoUploader logoUrl={teamSettings.logoUrl} teamId={teamId} onSave={onUpdateSettings} />
             </Card>
             <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
               Branding updates apply immediately across the entire app for all team members.
