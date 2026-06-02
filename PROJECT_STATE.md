@@ -4,7 +4,7 @@
 > context that does NOT live in the source code. Read this + `CLAUDE.md` + recent
 > `git log` to start a new session fully oriented.
 >
-> Last updated: 2026-06-01
+> Last updated: 2026-06-02
 
 ---
 
@@ -16,7 +16,7 @@
 | **Apex domain** | `mat-mind.com` (note the hyphen) |
 | **Team subdomains** | `test.mat-mind.com`, `lovetths.mat-mind.com`, `lovettyouth.mat-mind.com` |
 | **DNS** | Squarespace: A record + wildcard `*` CNAME → `cname.vercel-dns.com`. Each subdomain also added individually in Vercel (wildcard verification needs Vercel nameservers, which we did not switch to). |
-| **DB migrations applied** | **001 → 018, all applied** to the live Supabase DB. |
+| **DB migrations applied** | **001 → 019** (019 adds the AI-channel-mode setting — run it in the SQL editor if not yet applied). |
 | **Local dev** | `npm run dev` runs in **demo mode** (no Supabase env vars) — uses mock data in `src/lib/mockData.js`. Admin/super-admin UI is NOT visible in demo. |
 
 ### Team slugs (lowercase — browsers lowercase hostnames)
@@ -100,7 +100,11 @@ These were set in the Supabase dashboard and won't appear by reading the repo:
 - Channel image/file attachments (`channel-files` bucket)
 - Message **edit & delete** (tap a message; coaches can moderate any)
 - **AI in group channels** — `@MatMind` mention or question detection → AI answers
-  from KB/schedule/roster (Q&A mode, no tools)
+  from KB/schedule/roster (Q&A mode, no tools). **Conservative trigger** (real
+  questions only; never hijacks messages addressed to a person; ignores meta-chatter)
+  + **admin "AI Assistant" mode** in Settings: Off / Mentions / Smart (migration 019,
+  `team_settings.ai_channel_mode`, default `smart`). Private coach AI channel is
+  always fully active regardless.
 - **Unified push notifications** — channel messages auto-notify subscribers;
   per-channel prefs (dynamic from groups); removed the manual bell; self-test
   button in Settings
@@ -146,6 +150,12 @@ These were set in the Supabase dashboard and won't appear by reading the repo:
 6. **Slugs are lowercase** — browsers lowercase hostnames; store team slugs lowercase.
 7. **Realtime** needs `messages` in the `supabase_realtime` publication +
    `REPLICA IDENTITY FULL` (migrations 015/018).
+8. **Channel AI must stay out of conversation.** `shouldTriggerAI`
+   (`ChannelThread.jsx`) originally matched question words (`is`/`are`/`can`) as
+   substrings, so it replied to almost everything and users complained. It now
+   needs a real `?`, won't answer messages addressed to a person (roster name +
+   comma), ignores meta-chatter, and obeys the per-team `ai_channel_mode`
+   (off/mentions/smart). If you touch it, keep it conservative.
 
 ---
 
