@@ -8,29 +8,40 @@ import { isDemo } from '../lib/supabase';
 
 // ── AI trigger detection ──────────────────────────────────────────────────────
 // Returns true when a channel message should get an AI response.
-// Two modes:
-//   1. Explicit: message starts with @matmind or @ai — always triggers
-//   2. Automatic: message looks like a question (? or question-starter words)
+// Decides whether the AI should auto-reply to a channel message. Deliberately
+// CONSERVATIVE — it should stay out of normal human conversation:
+//   • Always replies when explicitly addressed: @MatMind / @ai
+//   • Otherwise only replies to a genuine question (must contain "?")
+//   • Never hijacks a message addressed to a person ("Debbie, are you …?")
+//   • Ignores meta-chatter about the AI/system itself, and very short remarks
+// (The old version matched "is"/"are"/"can" as substrings, so almost any
+// sentence triggered it — that's what made it reply to everything.)
 
-function shouldTriggerAI(text) {
-  const t = text.toLowerCase().trim();
-  if (!t || t.length < 4) return false;
+function escapeRx(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-  // Explicit mention — always triggers regardless of phrasing
-  if (t.startsWith('@matmind') || t.startsWith('@ai ') || t === '@ai') return true;
+function shouldTriggerAI(text, roster = []) {
+  const t = (text || '').trim();
+  if (t.length < 10) return false; // ignore short/casual remarks
 
-  // Automatic: question mark anywhere in the message
-  if (t.includes('?')) return true;
+  // Explicit mention — always replies, regardless of phrasing
+  if (/(^|\s)@(matmind|ai)\b/i.test(t)) return true;
 
-  // Automatic: starts with or contains a question-starter word/phrase
-  const starters = [
-    'when ', 'where ', 'what ', 'who ', 'how ', 'why ',
-    'is ', 'are ', 'was ', 'were ', 'does ', 'do ', 'did ',
-    'can ', 'will ', 'should ', 'could ', 'would ',
-    'anyone know', 'does anyone', 'do we ', 'do you ',
-    'any idea', 'any info', 'remind me', 'tell me',
-  ];
-  return starters.some(s => t.startsWith(s) || t.includes(` ${s}`));
+  // Auto-reply requires an actual question mark
+  if (!t.includes('?')) return false;
+
+  // Don't answer a message clearly addressed to a person ("Joey, can you …?")
+  const firstNames = roster
+    .map(m => (m.name || '').trim().split(/\s+/)[0])
+    .filter(n => n.length > 1);
+  if (firstNames.some(n => new RegExp(`\\b${escapeRx(n)}\\s*,`, 'i').test(t))) return false;
+
+  // Stay out of meta-conversation about the AI / system itself
+  if (/\b(ai|matmind|bot|chatbot)\b/i.test(t) &&
+      /\b(turn off|shut off|disable|stop|mute|are you|is this|automat|respond|chime in|who created)\b/i.test(t)) {
+    return false;
+  }
+
+  return true;
 }
 
 // ── Claude intent execution ───────────────────────────────────────────────────
@@ -419,9 +430,9 @@ export default function ChannelThread({
     } else {
       onSendMessage(channel.id, text, attachments);
 
-      // If the message looks like a question (or starts with @MatMind),
-      // ask Claude and post the answer back to the channel.
-      if (!attachments && shouldTriggerAI(text) && onSendAIMessage) {
+      // Reply only to a real question or an explicit @MatMind mention —
+      // and never to a message addressed to a person. (See shouldTriggerAI.)
+      if (!attachments && shouldTriggerAI(text, roster) && onSendAIMessage) {
         // Strip the @mention prefix before sending to the AI
         const aiQuery = text.replace(/^@matmind\s*/i, '').replace(/^@ai\s*/i, '').trim() || text;
         setChannelAITyping(true);
