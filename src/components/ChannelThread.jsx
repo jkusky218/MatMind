@@ -19,14 +19,17 @@ import { isDemo } from '../lib/supabase';
 
 function escapeRx(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-function shouldTriggerAI(text, roster = []) {
+function shouldTriggerAI(text, roster = [], mode = 'smart') {
+  if (mode === 'off') return false; // AI silent in group channels
+
   const t = (text || '').trim();
   if (t.length < 10) return false; // ignore short/casual remarks
 
-  // Explicit mention — always replies, regardless of phrasing
+  // Explicit mention — always replies (the only trigger in 'mentions' mode)
   if (/(^|\s)@(matmind|ai)\b/i.test(t)) return true;
+  if (mode === 'mentions') return false;
 
-  // Auto-reply requires an actual question mark
+  // 'smart' auto-reply requires an actual question mark
   if (!t.includes('?')) return false;
 
   // Don't answer a message clearly addressed to a person ("Joey, can you …?")
@@ -430,9 +433,8 @@ export default function ChannelThread({
     } else {
       onSendMessage(channel.id, text, attachments);
 
-      // Reply only to a real question or an explicit @MatMind mention —
-      // and never to a message addressed to a person. (See shouldTriggerAI.)
-      if (!attachments && shouldTriggerAI(text, roster) && onSendAIMessage) {
+      // Reply per the team's AI channel mode (off / mentions / smart).
+      if (!attachments && shouldTriggerAI(text, roster, teamSettings.aiChannelMode) && onSendAIMessage) {
         // Strip the @mention prefix before sending to the AI
         const aiQuery = text.replace(/^@matmind\s*/i, '').replace(/^@ai\s*/i, '').trim() || text;
         setChannelAITyping(true);

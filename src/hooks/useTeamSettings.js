@@ -15,6 +15,7 @@ export const DEMO_SETTINGS = {
   mascot:         'Lions',
   mascotEmoji:    '🦁',
   logoUrl:        null,
+  aiChannelMode:  'smart',
   groups: [
     { id: 'coaches',  label: 'Coaches',  color: '#C4A44A' },
     { id: 'tots',     label: 'Tots',     color: '#7B5EA7' },
@@ -35,6 +36,7 @@ function normalizeSettings(row) {
     mascot:              row.mascot               || '',
     mascotEmoji:         row.mascot_emoji         || '🏆',
     logoUrl:             row.logo_url             || null,
+    aiChannelMode:       row.ai_channel_mode      || 'smart',
     groups:              Array.isArray(row.groups) ? row.groups : DEMO_SETTINGS.groups,
     notificationSettings: row.notification_settings || {},
   };
@@ -74,6 +76,7 @@ export function useTeamSettings(auth) {
     if (updates.primaryColor   !== undefined) dbUpdates.primary_color   = updates.primaryColor;
     if (updates.secondaryColor !== undefined) dbUpdates.secondary_color = updates.secondaryColor;
     if (updates.logoUrl        !== undefined) dbUpdates.logo_url        = updates.logoUrl;
+    if (updates.aiChannelMode  !== undefined) dbUpdates.ai_channel_mode = updates.aiChannelMode;
     if (updates.groups         !== undefined) dbUpdates.groups          = updates.groups;
 
     // Optimistic update — apply immediately to local state

@@ -753,6 +753,35 @@ function LogoUploader({ logoUrl, teamId, onSave }) {
   );
 }
 
+// ── AI channel mode (admin) ───────────────────────────────────────────────────
+
+function AiChannelModeRow({ mode = 'smart', onSave }) {
+  const [saving, setSaving] = useState(false);
+  const opts = [
+    { v: 'off',      label: 'Off',      desc: 'The AI never replies in group channels.' },
+    { v: 'mentions', label: 'Mentions', desc: 'The AI replies only when someone tags @MatMind.' },
+    { v: 'smart',    label: 'Smart',    desc: 'The AI replies to genuine questions and @MatMind mentions, and stays out of normal conversation.' },
+  ];
+  async function pick(v) { if (v === mode || saving) return; setSaving(true); await onSave({ aiChannelMode: v }); setSaving(false); }
+  const current = opts.find(o => o.v === mode) || opts[2];
+  return (
+    <div style={{ padding: '13px 16px' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 9 }}>
+        {opts.map(o => (
+          <button key={o.v} onClick={() => pick(o.v)} disabled={saving} style={{
+            flex: 1, padding: '9px 0', borderRadius: 9, fontSize: 12.5, fontWeight: 700,
+            cursor: saving ? 'default' : 'pointer', border: '1.5px solid',
+            borderColor: mode === o.v ? BRAND.navy : '#e0e6ee',
+            background: mode === o.v ? BRAND.navy : '#fff',
+            color: mode === o.v ? '#fff' : '#8a96a3', transition: 'all 0.12s',
+          }}>{o.label}</button>
+        ))}
+      </div>
+      <p style={{ fontSize: 11.5, color: '#8a96a3', margin: 0, lineHeight: 1.45 }}>{current.desc}</p>
+    </div>
+  );
+}
+
 // ── Main SettingsPage ─────────────────────────────────────────────────────────
 
 export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings, onClose, push }) {
@@ -948,6 +977,16 @@ export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings
             </Card>
             <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
               Groups control channel access and event filtering. The Coaches group cannot be removed.
+            </p>
+
+            {/* AI Assistant */}
+            <SectionLabel adminOnly>AI Assistant</SectionLabel>
+            <Card>
+              <AiChannelModeRow mode={teamSettings.aiChannelMode} onSave={onUpdateSettings} />
+            </Card>
+            <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
+              Controls how the AI replies in group channels. The private MatMind AI coach
+              channel is always fully active regardless of this setting.
             </p>
 
             {/* Member Management */}
