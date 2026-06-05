@@ -11,10 +11,17 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 // ── Automatic updates ─────────────────────────────────────────────────────────
-// vite-plugin-pwa (autoUpdate mode) posts SKIP_WAITING when a new SW is ready.
-// We call skipWaiting() so the new SW activates immediately instead of waiting
-// for all tabs to close — critical for home-screen / standalone PWA installs.
+// With injectManifest + autoUpdate, nothing reliably posts SKIP_WAITING, so a
+// new service worker would install and sit in "waiting" forever — meaning the
+// OLD cached bundle keeps being served to users (they never get new releases).
+// Calling skipWaiting() in `install` makes every new SW activate immediately;
+// clients.claim() then fires `controllerchange` in the app, which shows the
+// "Update available" banner. This is what actually pushes new builds to devices.
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
 
+// Belt-and-suspenders: also honor an explicit SKIP_WAITING message.
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
@@ -22,7 +29,7 @@ self.addEventListener('message', (event) => {
 });
 
 // Claim all open clients immediately so the controllerchange event fires
-// in the app and it can reload to pick up the new precached assets.
+// in the app and it can surface the update banner.
 self.addEventListener('activate', (event) => {
   event.waitUntil(clients.claim());
 });
