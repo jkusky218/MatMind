@@ -61,7 +61,7 @@ export function useAuth() {
     setLoading(false);
   }
 
-  const signIn = useCallback(async (email, password, role) => {
+  const signIn = useCallback(async (email, password, role, teamId) => {
     if (isDemo) {
       const demoUser = DEMO_USERS[role] || DEMO_USERS.coach;
       setUser(demoUser);
@@ -69,9 +69,31 @@ export function useAuth() {
       return { error: null };
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { data, error };
+
+    // Cross-check: profile must belong to the team resolved from the subdomain.
+    // Fetches inline here before fetchProfile completes to catch mismatches early.
+    if (teamId && data.user) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('team_id')
+        .eq('id', data.user.id)
+        .single();
+      if (prof && prof.team_id !== teamId) {
+        await supabase.auth.signOut();
+        return { data: null, error: { message: 'This account does not belong to this team.' } };
+      }
+    }
+
+    return { data, error };
+  }, []);
+
+  const sendMagicLink = useCallback(async (email) => {
+    if (isDemo) return { error: null };
+    const { data, error } = await supabase.auth.signInWithOtp({
       email,
-      password,
+      options: { shouldCreateUser: false },
     });
     return { data, error };
   }, []);
@@ -107,6 +129,7 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    sendMagicLink,
     isDemo,
     isCoach: profile?.role === 'coach' || profile?.role === 'admin',
   };

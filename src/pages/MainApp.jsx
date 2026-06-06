@@ -13,7 +13,7 @@ const TABS = [
   { id: 'roster',   label: 'Roster',   Icon: Users },
 ];
 
-export default function MainApp({ auth }) {
+export default function MainApp({ auth, team }) {
   const [tab, setTab]                 = useState('messages');
   const [activeChannel, setActiveChannel] = useState(null);
 
@@ -73,7 +73,7 @@ export default function MainApp({ auth }) {
           <div style={{ flex: 1 }}>
             <p style={{ fontWeight: 700, fontSize: 16, color: '#fff', margin: 0, letterSpacing: -0.3 }}>MatMind</p>
             <p style={{ fontSize: 11, color: BRAND.columbiaMid, margin: 0 }}>
-              Lovett Wrestling{isDemo ? ' · Demo' : ''}
+              {team?.name ?? 'Lovett Wrestling'}{isDemo ? ' · Demo' : ''}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

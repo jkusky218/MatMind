@@ -1,11 +1,13 @@
 import { useAuth } from './hooks/useAuth';
+import { TeamProvider, useTeam } from './lib/TeamContext';
 import LoginScreen from './pages/LoginScreen';
 import MainApp from './pages/MainApp';
 
-export default function App() {
+function AppInner() {
   const auth = useAuth();
+  const { team, teamLoading, teamNotFound } = useTeam();
 
-  if (auth.loading) {
+  if (teamLoading || auth.loading) {
     return (
       <div style={{
         height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -19,9 +21,34 @@ export default function App() {
     );
   }
 
-  if (!auth.user) {
-    return <LoginScreen auth={auth} />;
+  if (teamNotFound) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(145deg, #0F2440 0%, #1B3A5C 100%)',
+        padding: '0 32px', textAlign: 'center',
+      }}>
+        <p style={{ fontSize: 32, marginBottom: 12 }}>🤼</p>
+        <p style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Team not found</p>
+        <p style={{ fontSize: 14, color: '#A5D0F0', maxWidth: 300 }}>
+          The team at this address doesn't exist. Check the URL or contact your coach.
+        </p>
+      </div>
+    );
   }
 
-  return <MainApp auth={auth} />;
+  if (!auth.user) {
+    return <LoginScreen auth={auth} team={team} />;
+  }
+
+  return <MainApp auth={auth} team={team} />;
+}
+
+export default function App() {
+  return (
+    <TeamProvider>
+      <AppInner />
+    </TeamProvider>
+  );
 }
