@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MatMind — SDLC Pipeline</title>
+<style>
+  :root{
+    --navy:#1B3A5C; --navy-dark:#0F2440; --navy-light:#2A4F7A;
+    --columbia:#6BADE4; --columbia-light:#E8F2FC; --gold:#C4A44A; --gold-light:#FAF3E0;
+    --ink:#1a2230; --muted:#5a6675; --line:#e3e9f0; --bg:#f6f8fb;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.5}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 64px}
+  header.hero{background:linear-gradient(135deg,var(--navy-dark),var(--navy) 60%,var(--navy-light));color:#fff;padding:40px 0 34px;margin-bottom:36px}
+  header.hero .wrap{display:flex;align-items:center;gap:16px;padding-bottom:0}
+  .logo{width:52px;height:52px;border-radius:14px;background:rgba(107,173,228,.18);border:1px solid rgba(107,173,228,.35);display:flex;align-items:center;justify-content:center;font-size:28px}
+  header h1{font-size:30px;font-weight:800;letter-spacing:-.4px}
+  header .sub{color:var(--columbia-light);font-size:14px;font-weight:600;margin-top:2px}
+  header .pill{margin-left:auto;background:rgba(196,164,74,.15);border:1px solid rgba(196,164,74,.45);color:#e7c766;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:7px 13px;border-radius:20px}
+  .lead{font-size:16px;color:var(--muted);max-width:760px;margin-bottom:32px}
+  .lead b{color:var(--navy)}
+  h2.section{font-size:13px;font-weight:800;color:var(--columbia);text-transform:uppercase;letter-spacing:1.2px;margin:36px 0 16px;display:flex;align-items:center;gap:8px}
+  h2.section::before{content:'';width:20px;height:3px;background:var(--gold);border-radius:2px}
+
+  /* Pipeline */
+  .pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  .stage{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 16px;position:relative;box-shadow:0 1px 3px rgba(15,36,64,.05)}
+  .stage .n{position:absolute;top:-11px;left:16px;width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .stage .ic{font-size:24px;margin-bottom:8px}
+  .stage h3{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:5px}
+  .stage p{font-size:12px;color:var(--muted)}
+  .stage .art{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+  .stage .art a,.stage .art span{font-size:11px;font-weight:600;color:var(--navy-light);text-decoration:none;background:var(--columbia-light);border-radius:6px;padding:3px 7px;display:inline-block;width:fit-content}
+  .arrow-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:6px 0 0}
+  .arrow{text-align:center;color:var(--columbia);font-size:18px}
+  @media(max-width:880px){.pipe,.arrow-row{grid-template-columns:1fr 1fr}.arrow-row{display:none}}
+
+  /* Roles / cadence cards */
+  .cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media(max-width:760px){.cards{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h4{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:6px}
+  .card ul{margin:0;padding-left:18px}
+  .card li{font-size:12.5px;color:var(--muted);margin:3px 0}
+
+  /* Principles */
+  .principles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:760px){.principles{grid-template-columns:1fr}}
+  .prin{background:#fff;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:13px 15px}
+  .prin b{color:var(--navy);font-size:13.5px}
+  .prin span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+  /* Gate table */
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+  th{background:var(--columbia-light);color:var(--navy);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  tr:last-child td{border-bottom:none}
+  td code{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
+  footer{margin-top:40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:16px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  footer b{color:var(--gold)}
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="logo">🦁</div>
+      <div>
+        <h1>MatMind · SDLC Pipeline</h1>
+        <div class="sub">FROM IDEA TO PRODUCTION — HOW WE SHIP</div>
+      </div>
+      <div class="pill">Conversational-first PWA</div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <p class="lead">
+      MatMind moves work through five stages, each with a concrete artifact in this
+      repo. AI agents accelerate two of them — <b>story generation</b> and
+      <b>regression QA</b> — but every change still ships behind a written story and
+      passes the QA checklist. Stack: <b>React + Vite PWA</b>, <b>Supabase/Postgres
+      + RLS</b>, <b>Claude Haiku 4.5</b> on Vercel serverless, SendGrid, Twilio, Web Push.
+    </p>
+
+    <h2 class="section">The Pipeline</h2>
+    <div class="pipe">
+      <div class="stage"><div class="n">1</div><div class="ic">🗂️</div>
+        <h3>Backlog</h3>
+        <p>Prioritized features (P0–P3) tied to the product vision.</p>
+        <div class="art"><a href="backlog/feature-list.md">feature-list.md</a></div>
+      </div>
+      <div class="stage"><div class="n">2</div><div class="ic">📝</div>
+        <h3>Story Generation</h3>
+        <p>AI expands a feature into an acceptance-tested story.</p>
+        <div class="art">
+          <a href="backlog/cowork-story-generator-prompt.md">story prompt</a>
+          <a href="backlog/stories/">/stories</a>
+        </div>
+      </div>
+      <div class="stage"><div class="n">3</div><div class="ic">⚙️</div>
+        <h3>Development</h3>
+        <p>Branch → build → verify in a real browser → PR.</p>
+        <div class="art"><span>migrations + code</span><span>GitHub PR</span></div>
+      </div>
+      <div class="stage"><div class="n">4</div><div class="ic">🧪</div>
+        <h3>QA</h3>
+        <p>Agent drives the app through the 90-case checklist.</p>
+        <div class="art">
+          <a href="qa/test-checklist.md">checklist</a>
+          <a href="qa/cowork-qa-prompt.md">QA prompt</a>
+          <a href="qa/reports/">/reports</a>
+        </div>
+      </div>
+      <div class="stage"><div class="n">5</div><div class="ic">🚀</div>
+        <h3>Deploy</h3>
+        <p>Vercel auto-deploys <code>main</code>; migrations run in Supabase.</p>
+        <div class="art"><span>Vercel</span><span>Supabase</span></div>
+      </div>
+    </div>
+    <div class="arrow-row">
+      <div class="arrow">→</div><div class="arrow">→</div><div class="arrow">→</div><div class="arrow">→</div><div class="arrow"></div>
+    </div>
+
+    <h2 class="section">Quality Gates</h2>
+    <table>
+      <tr><th>Gate</th><th>When</th><th>Pass condition</th></tr>
+      <tr><td>Story complete</td><td>Before code</td><td>Acceptance criteria are runtime-observable; multi-tenancy + RLS addressed</td></tr>
+      <tr><td>Migrations lead deploys</td><td>Pre-merge</td><td>Schema change applied before/with code that reads it (e.g. <code>edited_at</code> before the messages query)</td></tr>
+      <tr><td>Real-browser verify</td><td>Pre-merge</td><td>Change demoed by driving the app — not just unit tests</td></tr>
+      <tr><td>Tenant isolation</td><td>Every release</td><td>No cross-team data access (AUTH-07) — a hard blocker</td></tr>
+      <tr><td>Regression QA</td><td>Pre-prod</td><td>90-case checklist green; report committed to <code>/reports</code></td></tr>
+      <tr><td>Update reaches devices</td><td>Post-deploy</td><td>SW activates new build (PWA-03); no stale cache</td></tr>
+    </table>
+
+    <h2 class="section">Who Does What</h2>
+    <div class="cards">
+      <div class="card"><h4>🧑‍🏫 Product / Coach-owner</h4><ul>
+        <li>Owns the backlog &amp; priorities</li>
+        <li>Approves side-effectful tests (email/SMS/invites)</li>
+        <li>Signs off on releases</li>
+      </ul></div>
+      <div class="card"><h4>🤖 Story Agent (Cowork)</h4><ul>
+        <li>Feature → structured story</li>
+        <li>Writes acceptance criteria &amp; test cases</li>
+        <li>Flags risks &amp; dependencies</li>
+      </ul></div>
+      <div class="card"><h4>🧪 QA Agent (Cowork)</h4><ul>
+        <li>Drives the deployed app</li>
+        <li>Runs the checklist, captures evidence</li>
+        <li>Files bugs, writes the report</li>
+      </ul></div>
+    </div>
+
+    <h2 class="section">Operating Principles</h2>
+    <div class="principles">
+      <div class="prin"><b>The AI is the app.</b><span>Conversational-first input; dashboards for context only.</span></div>
+      <div class="prin"><b>Multi-tenant by default.</b><span><code>team_id</code> + RLS on every table; isolation is non-negotiable.</span></div>
+      <div class="prin"><b>Skill-based groups.</b><span>Beginner/Advanced are skill tiers, never age brackets.</span></div>
+      <div class="prin"><b>Confirm before side effects.</b><span>The AI never sends, posts, or deletes without explicit confirmation.</span></div>
+      <div class="prin"><b>Verify at the surface.</b><span>Truth is the running app, observed through its real UI.</span></div>
+      <div class="prin"><b>Migrations lead code.</b><span>Schema lands before the code that depends on it.</span></div>
+    </div>
+
+    <footer>
+      <span>MatMind — AI-powered team management for youth wrestling.</span>
+      <span>Built for Lovett Wrestling <b>🦁</b> · Powered by Claude</span>
+    </footer>
+  </div>
+</body>
+</html>
