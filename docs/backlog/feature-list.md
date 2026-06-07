@@ -84,6 +84,33 @@ team-specific content.
 - **Acceptance:** AI cites KB content; URL import extracts page text.
 - **Deps:** F02.
 
+### F16 · In-App Support with MatMind Support AI  ⬜
+**As a** coach or parent **I want** a help button always visible in the header **so that**
+I can get instant answers or escalate issues without leaving the app.
+- **Support persona:** "MatMind Support" — a distinct AI identity separate from the team's
+  MatMind AI coach. Knows the product, not your roster.
+- **Universal entry point:** Help/support button in the app header, accessible to all users
+  (coaches, parents, athletes) on every screen.
+- **Dedicated private thread:** support chat is isolated from team channels; no team member
+  sees another user's support conversation.
+- **Three-tier triage model:**
+  - Tier 1 — AI answers instantly (how-to, feature questions, account basics)
+  - Tier 2 — AI cannot fully resolve → creates a ticket, human queued (< 4 hr business hours)
+  - Tier 3 — Auto-escalated sensitive topics or explicit "talk to a person" → human responds (< 1 business day)
+- **Auto-escalation triggers (always T3):** athlete safety concerns, billing disputes, account
+  security, FERPA/privacy, explicit request for human.
+- **Knowledge base:** product KB built into AI context; grows as resolved T3 tickets are
+  reviewed and promoted to KB entries. Separate from the team-specific KB (F08).
+- **No phone support** at launch.
+- **Data:** `support_tickets`, `support_messages`, `support_kb` tables in Supabase (not
+  team-scoped — scoped to `user_id` and optionally `team_id`).
+- **Metrics** feed into CEO Dashboard: ticket volume by tier, escalation rate, resolution
+  time, KB miss rate.
+- **Acceptance:** user taps Help → support thread opens; AI answers a how-to question
+  instantly; safety keyword triggers T3 escalation with human-review ticket; resolved T3
+  ticket can be promoted to KB; metrics visible in admin view.
+- **Deps:** F01 (auth), F02 (AI pattern), F08 (KB pattern).
+
 ---
 
 ## P2 — Depth & Polish
