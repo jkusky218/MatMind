@@ -2,15 +2,22 @@ import { createContext, useContext, useEffect, useState } from 'react';
 
 const TeamContext = createContext(null);
 
+// Production domain — slug resolution only activates on this domain.
+// Every other host (localhost, Vercel previews, ngrok, etc.) → demo mode.
+const PROD_DOMAIN = import.meta.env.VITE_APP_DOMAIN ?? 'mat-mind.com';
+
 function extractSlug(hostname) {
-  // localhost / IP → dev/demo mode, no slug
-  if (!hostname || hostname === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
-    return null;
-  }
-  const parts = hostname.split('.');
-  // Needs at least two dots to have a subdomain (e.g. lovett.mat-mind.com)
-  if (parts.length < 3) return null;
-  return parts[0];
+  if (!hostname) return null;
+
+  // Only resolve slugs on the configured production domain.
+  // e.g. lovett.mat-mind.com → 'lovett'
+  // anything else (localhost, *.vercel.app, etc.) → null → demo mode
+  if (!hostname.endsWith(`.${PROD_DOMAIN}`)) return null;
+
+  const slug = hostname.slice(0, hostname.length - PROD_DOMAIN.length - 1);
+  // Must be a non-empty, valid slug (no dots = not a nested subdomain)
+  if (!slug || slug.includes('.')) return null;
+  return slug;
 }
 
 export function TeamProvider({ children }) {
