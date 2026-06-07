@@ -130,5 +130,16 @@ export const Shield = (s = 14, c = "currentColor") => svg(
   s, c
 );
 
+export const ShieldCheck = (s = 18, c = "currentColor") => svg(<>
+  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+  <path d="m9 12 2 2 4-4"/>
+</>, s, c);
+
+export const HelpCircle = (s = 18, c = "currentColor") => svg(<>
+  <circle cx="12" cy="12" r="10"/>
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+  <line x1="12" y1="17" x2="12.01" y2="17"/>
+</>, s, c);
+
 // Map icon name strings to component functions (matches CHANNELS[].icon)
 export const ICON_MAP = { brain: Brain, megaphone: Megaphone, hash: Hash, lock: Lock };

@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { BRAND } from '../lib/constants';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
-import { Brain, Chat, Calendar, Users, UserIcon, BookOpen, Settings } from '../components/Icons';
+import { Brain, Chat, Calendar, Users, UserIcon, BookOpen, Settings, HelpCircle } from '../components/Icons';
+import SupportChat from '../components/SupportChat';
 import SettingsPage from '../components/SettingsPage';
 import { useTeamData } from '../hooks/useTeamData';
 import { useTeamSettings } from '../hooks/useTeamSettings';
@@ -28,6 +29,7 @@ export default function MainApp({ auth }) {
   const [activeChannel, setActiveChannel] = useState(null);
   const [adminOpen,    setAdminOpen]    = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showSupport,  setShowSupport]  = useState(false);
 
   const {
     roster, setRoster,
@@ -167,6 +169,13 @@ export default function MainApp({ auth }) {
             }}>
               {Settings(16, BRAND.columbia)}
             </button>
+            <button onClick={() => setShowSupport(true)} title="Support" style={{
+              background: 'rgba(5,150,105,0.18)', border: '1px solid rgba(5,150,105,0.35)',
+              borderRadius: 8, padding: '5px 9px', color: '#059669',
+              cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center',
+            }}>
+              {HelpCircle(16, '#059669')}
+            </button>
           </div>
         </div>
       )}
@@ -225,7 +234,9 @@ export default function MainApp({ auth }) {
           </div>
         )}
 
-        {settingsOpen ? (
+        {showSupport ? (
+          <SupportChat auth={auth} onBack={() => setShowSupport(false)} />
+        ) : settingsOpen ? (
           <SettingsPage auth={auth} teamSettings={teamSettings} onUpdateSettings={updateSettings} onClose={() => setSettingsOpen(false)} push={push} />
         ) : activeChannel ? (
           <ChannelThread
