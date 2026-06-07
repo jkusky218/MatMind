@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { BRAND } from '../lib/constants';
-import { Brain, Chat, Calendar, Users, UserIcon } from '../components/Icons';
+import { Brain, Chat, Calendar, Users, UserIcon, HelpCircle } from '../components/Icons';
 import { useTeamData } from '../hooks/useTeamData';
 import ChannelList   from '../components/ChannelList';
 import ChannelThread from '../components/ChannelThread';
 import ScheduleTab   from '../components/ScheduleTab';
 import RosterTab     from '../components/RosterTab';
+import SupportChat   from '../components/SupportChat';
 
 const TABS = [
   { id: 'messages', label: 'Messages', Icon: Chat },
@@ -13,9 +14,13 @@ const TABS = [
   { id: 'roster',   label: 'Roster',   Icon: Users },
 ];
 
+// MatMind Support accent colour (matches SupportChat.jsx)
+const SUPPORT_COLOR = '#059669';
+
 export default function MainApp({ auth, team }) {
-  const [tab, setTab]                 = useState('messages');
+  const [tab, setTab]                     = useState('messages');
   const [activeChannel, setActiveChannel] = useState(null);
+  const [showSupport, setShowSupport]     = useState(false);
 
   const {
     roster, setRoster,
@@ -57,95 +62,135 @@ export default function MainApp({ auth, team }) {
         button:active { transform: scale(0.97); }
       `}</style>
 
-      {/* ── App header (hidden inside channel thread) ── */}
-      {!activeChannel && (
-        <div style={{
-          background: `linear-gradient(135deg, ${BRAND.navyDark} 0%, ${BRAND.navy} 100%)`,
-          padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-        }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: '50%',
-            background: 'rgba(107,173,228,0.15)', border: '1px solid rgba(107,173,228,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {Brain(20, BRAND.columbia)}
-          </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 700, fontSize: 16, color: '#fff', margin: 0, letterSpacing: -0.3 }}>MatMind</p>
-            <p style={{ fontSize: 11, color: BRAND.columbiaMid, margin: 0 }}>
-              {team?.name ?? 'Lovett Wrestling'}{isDemo ? ' · Demo' : ''}
-            </p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 11, color: BRAND.columbiaMid, display: 'flex', alignItems: 'center', gap: 4 }}>
-              {UserIcon(12, BRAND.columbiaMid)}
-              <span style={{ textTransform: 'capitalize' }}>{auth.profile?.role ?? 'coach'}</span>
+      {/* ── Support view — full-height overlay ── */}
+      {showSupport ? (
+        <SupportChat auth={auth} onBack={() => setShowSupport(false)} />
+      ) : (
+        <>
+          {/* ── App header (hidden inside channel thread) ── */}
+          {!activeChannel && (
+            <div style={{
+              background: `linear-gradient(135deg, ${BRAND.navyDark} 0%, ${BRAND.navy} 100%)`,
+              padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+            }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: '50%',
+                background: 'rgba(107,173,228,0.15)', border: '1px solid rgba(107,173,228,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {Brain(20, BRAND.columbia)}
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 700, fontSize: 16, color: '#fff', margin: 0, letterSpacing: -0.3 }}>MatMind</p>
+                <p style={{ fontSize: 11, color: BRAND.columbiaMid, margin: 0 }}>
+                  {team?.name ?? 'Lovett Wrestling'}{isDemo ? ' · Demo' : ''}
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* ── Help button — always visible ── */}
+                <button
+                  onClick={() => setShowSupport(true)}
+                  title="Help & Support"
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: 'rgba(5,150,105,0.15)', border: '1px solid rgba(5,150,105,0.35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {HelpCircle(15, SUPPORT_COLOR)}
+                </button>
+                <div style={{ fontSize: 11, color: BRAND.columbiaMid, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {UserIcon(12, BRAND.columbiaMid)}
+                  <span style={{ textTransform: 'capitalize' }}>{auth.profile?.role ?? 'coach'}</span>
+                </div>
+                <button onClick={auth.signOut} style={{
+                  marginLeft: 4, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
+                  padding: '5px 10px', fontSize: 11, color: BRAND.columbiaMid, cursor: 'pointer',
+                }}>
+                  Sign out
+                </button>
+              </div>
             </div>
-            <button onClick={auth.signOut} style={{
-              marginLeft: 8, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
-              padding: '5px 10px', fontSize: 11, color: BRAND.columbiaMid, cursor: 'pointer',
-            }}>
-              Sign out
-            </button>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* ── Tab bar (hidden inside channel thread) ── */}
-      {!activeChannel && (
-        <div style={{ display: 'flex', borderBottom: '1px solid #e8edf2', background: '#fff', flexShrink: 0 }}>
-          {TABS.map(({ id, label, Icon }) => (
-            <button key={id} onClick={() => setTab(id)} style={{
-              flex: 1, padding: '10px 0', border: 'none', background: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              fontSize: 12, fontWeight: 600,
-              color: tab === id ? BRAND.navy : '#aab4c0',
-              borderBottom: tab === id ? `2px solid ${BRAND.navy}` : '2px solid transparent',
+          {/* Help button floated in channel thread header (when channel is open) */}
+          {activeChannel && (
+            <div style={{
+              position: 'absolute', top: 12, right: 12, zIndex: 10,
             }}>
-              {Icon(15, tab === id ? BRAND.navy : '#bcc5d0')}
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+              <button
+                onClick={() => setShowSupport(true)}
+                title="Help & Support"
+                style={{
+                  width: 30, height: 30, borderRadius: '50%',
+                  background: 'rgba(5,150,105,0.12)', border: '1px solid rgba(5,150,105,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                {HelpCircle(14, SUPPORT_COLOR)}
+              </button>
+            </div>
+          )}
 
-      {/* ── Content ── */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        {activeChannel ? (
-          <ChannelThread
-            channel={activeChannel}
-            messages={channelMessages[activeChannel.id] ?? []}
-            onBack={() => setActiveChannel(null)}
-            onSendMessage={sendMessage}
-            roster={roster}
-            events={events}
-            availability={availability}
-            setRoster={setRoster}
-            setEvents={setEvents}
-            setAvailability={setAvailability}
-            senderName={auth.profile?.full_name}
-          />
-        ) : (
-          <>
-            {tab === 'messages' && (
-              <ChannelList
-                onSelect={setActiveChannel}
-                channelMessages={channelMessages}
-              />
-            )}
-            {tab === 'schedule' && (
-              <ScheduleTab
+          {/* ── Tab bar (hidden inside channel thread) ── */}
+          {!activeChannel && (
+            <div style={{ display: 'flex', borderBottom: '1px solid #e8edf2', background: '#fff', flexShrink: 0 }}>
+              {TABS.map(({ id, label, Icon }) => (
+                <button key={id} onClick={() => setTab(id)} style={{
+                  flex: 1, padding: '10px 0', border: 'none', background: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  fontSize: 12, fontWeight: 600,
+                  color: tab === id ? BRAND.navy : '#aab4c0',
+                  borderBottom: tab === id ? `2px solid ${BRAND.navy}` : '2px solid transparent',
+                }}>
+                  {Icon(15, tab === id ? BRAND.navy : '#bcc5d0')}
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Content ── */}
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            {activeChannel ? (
+              <ChannelThread
+                channel={activeChannel}
+                messages={channelMessages[activeChannel.id] ?? []}
+                onBack={() => setActiveChannel(null)}
+                onSendMessage={sendMessage}
+                roster={roster}
                 events={events}
                 availability={availability}
-                roster={roster}
+                setRoster={setRoster}
+                setEvents={setEvents}
+                setAvailability={setAvailability}
+                senderName={auth.profile?.full_name}
               />
+            ) : (
+              <>
+                {tab === 'messages' && (
+                  <ChannelList
+                    onSelect={setActiveChannel}
+                    channelMessages={channelMessages}
+                  />
+                )}
+                {tab === 'schedule' && (
+                  <ScheduleTab
+                    events={events}
+                    availability={availability}
+                    roster={roster}
+                  />
+                )}
+                {tab === 'roster' && (
+                  <RosterTab roster={roster} />
+                )}
+              </>
             )}
-            {tab === 'roster' && (
-              <RosterTab roster={roster} />
-            )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

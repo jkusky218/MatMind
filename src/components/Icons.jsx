@@ -94,5 +94,24 @@ export const Pin = (s = 12, c = "currentColor") => svg(<>
   <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
 </>, s, c);
 
+export const HelpCircle = (s = 18, c = "currentColor") => svg(<>
+  <circle cx="12" cy="12" r="10"/>
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+  <line x1="12" y1="17" x2="12.01" y2="17"/>
+</>, s, c);
+
+export const ShieldCheck = (s = 18, c = "currentColor") => svg(<>
+  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+  <polyline points="9 12 11 14 15 10"/>
+</>, s, c);
+
+export const Ticket = (s = 18, c = "currentColor") => svg(<>
+  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+  <line x1="9" y1="9" x2="9.01" y2="9"/>
+  <line x1="15" y1="9" x2="15.01" y2="9"/>
+  <line x1="9" y1="15" x2="9.01" y2="15"/>
+  <line x1="15" y1="15" x2="15.01" y2="15"/>
+</>, s, c);
+
 // Map icon name strings to component functions (matches CHANNELS[].icon)
 export const ICON_MAP = { brain: Brain, megaphone: Megaphone, hash: Hash, lock: Lock };
