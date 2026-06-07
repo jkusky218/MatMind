@@ -78,16 +78,16 @@ function SupportBubble({ msg }) {
             </p>
           </div>
         )}
-        {/* SafeSport redirect notice */}
-        {msg.safesport && (
+        {/* Coach-redirect indicator */}
+        {msg.coachDefer && (
           <div style={{
-            marginTop: 6, padding: '8px 12px', borderRadius: 8,
-            background: '#EFF6FF', border: '1px solid #BFDBFE',
-            display: 'flex', alignItems: 'flex-start', gap: 8,
+            marginTop: 6, padding: '7px 12px', borderRadius: 8,
+            background: '#F0F9FF', border: '1px solid #BAE6FD',
+            display: 'flex', alignItems: 'center', gap: 6,
           }}>
-            <span style={{ fontSize: 14, flexShrink: 0 }}>🔗</span>
-            <p style={{ fontSize: 11, color: '#1E40AF', margin: 0, lineHeight: 1.5 }}>
-              <strong>safesport.org</strong> — U.S. Center for SafeSport
+            <span style={{ fontSize: 13 }}>👤</span>
+            <p style={{ fontSize: 11, color: '#0369A1', margin: 0 }}>
+              Contact your coach directly for this.
             </p>
           </div>
         )}

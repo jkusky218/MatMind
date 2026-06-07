@@ -5,10 +5,22 @@ import ChatBubble from './ChatBubble';
 
 // ── AI Engine ────────────────────────────────────────────────────────────────
 
+// Topics that coaches must handle directly — AI never responds to these
+const COACH_TOPIC_PATTERN = /(abus|assault|harass|bully|bullied|bullying|unsafe|threat|misconduct|inappropriate|hurt|injur|fight|attack|violence|concuss)/i;
+
 function generateAIResponse(message, roster, events, availability, setRoster, setEvents, setAvailability) {
   const lower = message.toLowerCase();
   const athletes = roster.filter(r => r.group !== 'coaches');
   const coaches  = roster.filter(r => r.group === 'coaches');
+
+  // Safety and conduct topics — always defer to a coach, never answer
+  if (COACH_TOPIC_PATTERN.test(message)) {
+    return {
+      text: 'That\'s something a coach needs to address directly. Please reach out to your coach in person or contact them directly.',
+      actions: [],
+      coachDefer: true,
+    };
+  }
 
   const detectGroup = (text) => {
     if (text.includes('coaches') || text.includes('coaching staff')) return 'coaches';

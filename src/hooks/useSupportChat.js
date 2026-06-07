@@ -3,8 +3,8 @@ import { isDemo } from '../lib/supabase';
 
 // ── Demo-mode local support responses ────────────────────────────────────────
 
-// Safety/abuse topics are NOT handled here — those belong with SafeSport.
-// Support only covers product questions and billing.
+// Support handles product questions and billing only.
+// Everything else — including conduct, safety, team matters — goes to a coach.
 const ESCALATION_PATTERNS = [
   // Billing / subscription
   /(billing|payment|charged|charge|refund|invoice|subscription|cancel.*plan)/i,
@@ -16,27 +16,25 @@ const ESCALATION_PATTERNS = [
   /(talk to (a |someone|a human|real)|speak to (a |someone)|human agent|real person)/i,
 ];
 
-// Topics that must be redirected to SafeSport — never handled in-app
-const SAFESPORT_PATTERNS = [
-  /(abus|assault|harass|bully|bullied|bullying|unsafe|threat|hurt|injur|misconduct|inappropriate)/i,
-];
+// Topics that are out of scope for product support — coach handles these
+const COACH_TOPIC_PATTERN = /(abus|assault|harass|bully|bullied|bullying|unsafe|threat|misconduct|inappropriate|hurt|injur|fight|attack|violence|concuss)/i;
 
 function isEscalationNeeded(text) {
   return ESCALATION_PATTERNS.some(p => p.test(text));
 }
 
-function isSafeSportTopic(text) {
-  return SAFESPORT_PATTERNS.some(p => p.test(text));
+function isCoachTopic(text) {
+  return COACH_TOPIC_PATTERN.test(text);
 }
 
 function generateDemoResponse(message) {
   const lower = message.toLowerCase();
 
-  // Safety and conduct concerns must go through SafeSport — not this app
-  if (isSafeSportTopic(message)) {
+  // Conduct, safety, and team matters are not product support — refer to coach
+  if (isCoachTopic(message)) {
     return {
-      text: "MatMind Support only handles product and billing questions. Concerns about athlete safety, misconduct, or abuse must be reported through **SafeSport** — the independent organization that handles these matters for youth sports.\n\nPlease visit **safesport.org** or contact your program administrator directly.",
-      safesport: true,
+      text: "That's not something MatMind Support can help with. Please contact your coach directly.",
+      coachDefer: true,
     };
   }
 
@@ -82,7 +80,7 @@ const INITIAL_GREETING = {
   id: 'greeting',
   role: 'support',
   sender: 'MatMind Support',
-  text: "Hi! I'm **MatMind Support** — your dedicated help assistant, separate from your team's AI.\n\nI can answer product questions, help with account issues, and escalate anything urgent to a real human. What can I help you with?",
+  text: "Hi! I'm **MatMind Support** — here to help with app and billing questions.\n\nFor anything else — team matters, practice questions, athlete concerns — please contact your coach directly.",
   time: 'Now',
 };
 
@@ -128,11 +126,11 @@ export function useSupportChat({ auth }) {
         const result = generateDemoResponse(text);
         reply        = result.text;
         didEscalate  = result.escalated ?? false;
-        if (result.safesport) {
-          // Treat as a special non-escalation redirect — no ticket created
+        if (result.coachDefer) {
+          // Out of scope — no ticket created, just show the redirect message
           setMessages(prev => [...prev, {
             id: Date.now() + 1, role: 'support', sender: 'MatMind Support',
-            text: reply, safesport: true, time: 'Now',
+            text: reply, coachDefer: true, time: 'Now',
           }]);
           setLoading(false);
           return;

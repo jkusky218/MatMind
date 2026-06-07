@@ -13,9 +13,9 @@ import { createClient } from '@supabase/supabase-js';
 
 // ── Escalation detection ─────────────────────────────────────────────────────
 
-// Safety/abuse/misconduct are NOT escalated here — they belong with SafeSport.
-// This support system covers product questions and billing only.
-const SAFESPORT_PATTERN = /(abus|assault|harass|bully|bullied|bullying|unsafe|threat|hurt|injur|misconduct|inappropriate)/i;
+// Support covers product questions and billing only.
+// Conduct, safety, and team matters are not product support — refer to coach.
+const COACH_TOPIC_PATTERN = /(abus|assault|harass|bully|bullied|bullying|unsafe|threat|hurt|injur|misconduct|inappropriate|fight|attack|violence|concuss)/i;
 
 const ESCALATION_PATTERNS = [
   // Billing / subscription
@@ -76,7 +76,7 @@ ${kbText}
 - You are NOT authorised to modify any data, create events, or manage rosters — direct users to the MatMind AI for that
 - Do not make up features that don't exist
 - Do not speculate on pricing, roadmap, or business decisions
-- **Never accept or process reports of athlete abuse, bullying, harassment, assault, or any safety/misconduct concern.** These matters are handled exclusively by SafeSport and must never be routed through this app. If a user raises any such topic, respond only with: "MatMind Support handles product and billing questions only. For athlete safety or misconduct concerns, please contact SafeSport at safesport.org or your program administrator."
+- **Only answer questions about the MatMind product and billing.** For anything else — team matters, athlete concerns, conduct, schedules, practice questions, or anything not directly about using the app — respond only with: "That's not something MatMind Support can help with. Please contact your coach directly."
 
 ## Escalation instructions
 If the user's message involves athlete safety, child welfare, abuse, bullying, billing disputes, legal or privacy concerns, or if they explicitly ask for a human — your response must end with exactly this JSON marker on its own line:
@@ -97,13 +97,13 @@ export default async function handler(req, res) {
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const apiKey      = process.env.ANTHROPIC_API_KEY;
 
-  // ── Step 1: SafeSport redirect check — return immediately, no ticket ─────────
-  if (SAFESPORT_PATTERN.test(message)) {
+  // ── Step 1: coach-topic check — out of scope, return immediately, no ticket ──
+  if (COACH_TOPIC_PATTERN.test(message)) {
     return res.status(200).json({
-      reply: "MatMind Support only handles product and billing questions. Concerns about athlete safety, misconduct, or abuse must be reported through **SafeSport** — the independent organization that handles these matters for youth sports.\n\nPlease visit **safesport.org** or contact your program administrator directly.",
-      escalated: false,
-      safesport: true,
-      ticketId:  null,
+      reply:      "That's not something MatMind Support can help with. Please contact your coach directly.",
+      escalated:  false,
+      coachDefer: true,
+      ticketId:   null,
     });
   }
 
