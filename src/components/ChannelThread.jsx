@@ -53,6 +53,8 @@ function shouldTriggerAI(text, roster = [], mode = 'smart') {
 
 const VALID_GROUPS = new Set(['all', 'advanced', 'beginner', 'tots', 'coaches']);
 
+const COACH_TOPIC_PATTERN = /(abus|assault|harass|bully|bullied|bullying|unsafe|threat|misconduct|inappropriate|hurt|injur|fight|attack|violence|concuss)/i;
+
 async function executeClaudeIntents(intents, { createEvent, updateAvailabilityEntry, sendMessage, roster, events }) {
   if (!intents?.length) return { succeeded: 0, errors: [] };
   const errors = [];
@@ -372,6 +374,17 @@ export default function ChannelThread({
 
       try {
 
+      if (COACH_TOPIC_PATTERN.test(text)) {
+        setAiMsgs(prev => [...prev, {
+          id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', time: 'Now',
+          text: "That's something a coach needs to address directly. Please reach out to your coach in person or contact them directly.",
+          actions: [],
+          coachDefer: true,
+        }]);
+        setTyping(false);
+        return;
+      }
+
       // ── 1. Get Claude's response (it includes structured intents when needed) ──
       const resp = await sendToMatMind(
         text,
@@ -439,6 +452,11 @@ export default function ChannelThread({
         const aiQuery = text.replace(/^@matmind\s*/i, '').replace(/^@ai\s*/i, '').trim() || text;
         setChannelAITyping(true);
         try {
+          if (COACH_TOPIC_PATTERN.test(aiQuery)) {
+            await onSendAIMessage(channel.id, "That's something a coach needs to address directly. Please reach out to your coach in person or contact them directly.");
+            setChannelAITyping(false);
+            return;
+          }
           const resp = await sendToMatMind(
             aiQuery,
             {

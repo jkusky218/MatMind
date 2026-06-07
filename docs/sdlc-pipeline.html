@@ -1,254 +1,171 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MatMind SDLC Pipeline</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MatMind — SDLC Pipeline</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: #0A0E17; color: #E8ECF4; padding: 40px 20px; }
-  .page { max-width: 900px; margin: 0 auto; }
-  
-  .header { text-align: center; margin-bottom: 48px; }
-  .header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
-  .header p { font-size: 14px; color: #6B7A99; }
-  .header .badge { display: inline-block; margin-top: 12px; padding: 4px 14px; border-radius: 20px; background: rgba(26,107,245,0.1); border: 1px solid rgba(26,107,245,0.2); font-size: 11px; color: #1A6BF5; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; }
-
-  .legend { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; padding: 16px 24px; background: #111827; border: 1px solid #1E2A42; border-radius: 12px; }
-  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #8B9BC0; }
-  .legend-dot { width: 12px; height: 12px; border-radius: 4px; }
-
-  .pipeline { position: relative; }
-  
-  .phase-section { margin-bottom: 32px; }
-  .phase-label { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-  .phase-label span { font-size: 11px; font-weight: 700; letter-spacing: 2px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
-  .phase-label hr { flex: 1; border: none; height: 1px; background: #1E2A42; }
-
-  .stage-row { display: flex; gap: 16px; margin-bottom: 12px; align-items: stretch; }
-  .stage-card { flex: 1; background: #111827; border: 1px solid #1E2A42; border-radius: 12px; padding: 20px; position: relative; overflow: hidden; }
-  .stage-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-  .stage-card.purple::before { background: #7F77DD; }
-  .stage-card.teal::before { background: #1D9E75; }
-  .stage-card.blue::before { background: #378ADD; }
-  .stage-card.gray::before { background: #888780; }
-  .stage-card.amber::before { background: #BA7517; }
-
-  .stage-num { font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; margin-bottom: 8px; }
-  .stage-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-  .stage-tool { font-size: 12px; font-weight: 500; margin-bottom: 10px; }
-  .stage-desc { font-size: 12px; color: #8B9BC0; line-height: 1.7; }
-  .stage-tip { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 11px; line-height: 1.6; }
-
-  .arrow-row { display: flex; justify-content: center; margin: -4px 0; }
-  .arrow-row svg { width: 24px; height: 24px; }
-
-  .loop-indicator { display: flex; align-items: center; justify-content: center; gap: 8px; margin: -4px 0 12px; padding: 8px 16px; }
-  .loop-indicator span { font-size: 11px; color: #6B7A99; font-family: 'JetBrains Mono', monospace; }
-
-  .session-strategy { margin-top: 48px; background: linear-gradient(135deg, rgba(26,107,245,0.08), rgba(26,107,245,0.02)); border: 1px solid rgba(26,107,245,0.2); border-radius: 16px; padding: 28px; }
-  .session-strategy h3 { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #fff; }
-  .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .strategy-item { background: rgba(10,14,23,0.6); border-radius: 10px; padding: 16px; }
-  .strategy-item h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-  .strategy-item p { font-size: 12px; color: #8B9BC0; line-height: 1.6; }
-  .strategy-item .metric { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
-
-  .footer { margin-top: 48px; text-align: center; padding-top: 24px; border-top: 1px solid #1E2A42; }
-  .footer p { font-size: 11px; color: #3D4B66; }
-
-  @media (max-width: 700px) {
-    .stage-row { flex-direction: column; }
-    .strategy-grid { grid-template-columns: 1fr; }
-    .legend { gap: 12px; }
+  :root{
+    --navy:#1B3A5C; --navy-dark:#0F2440; --navy-light:#2A4F7A;
+    --columbia:#6BADE4; --columbia-light:#E8F2FC; --gold:#C4A44A; --gold-light:#FAF3E0;
+    --ink:#1a2230; --muted:#5a6675; --line:#e3e9f0; --bg:#f6f8fb;
   }
-  @media print {
-    body { background: #fff; color: #1a1a1a; }
-    .stage-card { border-color: #ddd; background: #f9f9f9; }
-    .stage-desc, .strategy-item p { color: #555; }
-  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.5}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 64px}
+  header.hero{background:linear-gradient(135deg,var(--navy-dark),var(--navy) 60%,var(--navy-light));color:#fff;padding:40px 0 34px;margin-bottom:36px}
+  header.hero .wrap{display:flex;align-items:center;gap:16px;padding-bottom:0}
+  .logo{width:52px;height:52px;border-radius:14px;background:rgba(107,173,228,.18);border:1px solid rgba(107,173,228,.35);display:flex;align-items:center;justify-content:center;font-size:28px}
+  header h1{font-size:30px;font-weight:800;letter-spacing:-.4px}
+  header .sub{color:var(--columbia-light);font-size:14px;font-weight:600;margin-top:2px}
+  header .pill{margin-left:auto;background:rgba(196,164,74,.15);border:1px solid rgba(196,164,74,.45);color:#e7c766;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:7px 13px;border-radius:20px}
+  .lead{font-size:16px;color:var(--muted);max-width:760px;margin-bottom:32px}
+  .lead b{color:var(--navy)}
+  h2.section{font-size:13px;font-weight:800;color:var(--columbia);text-transform:uppercase;letter-spacing:1.2px;margin:36px 0 16px;display:flex;align-items:center;gap:8px}
+  h2.section::before{content:'';width:20px;height:3px;background:var(--gold);border-radius:2px}
+
+  /* Pipeline */
+  .pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  .stage{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 16px;position:relative;box-shadow:0 1px 3px rgba(15,36,64,.05)}
+  .stage .n{position:absolute;top:-11px;left:16px;width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .stage .ic{font-size:24px;margin-bottom:8px}
+  .stage h3{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:5px}
+  .stage p{font-size:12px;color:var(--muted)}
+  .stage .art{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+  .stage .art a,.stage .art span{font-size:11px;font-weight:600;color:var(--navy-light);text-decoration:none;background:var(--columbia-light);border-radius:6px;padding:3px 7px;display:inline-block;width:fit-content}
+  .arrow-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:6px 0 0}
+  .arrow{text-align:center;color:var(--columbia);font-size:18px}
+  @media(max-width:880px){.pipe,.arrow-row{grid-template-columns:1fr 1fr}.arrow-row{display:none}}
+
+  /* Roles / cadence cards */
+  .cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media(max-width:760px){.cards{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h4{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:6px}
+  .card ul{margin:0;padding-left:18px}
+  .card li{font-size:12.5px;color:var(--muted);margin:3px 0}
+
+  /* Principles */
+  .principles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:760px){.principles{grid-template-columns:1fr}}
+  .prin{background:#fff;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:13px 15px}
+  .prin b{color:var(--navy);font-size:13.5px}
+  .prin span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+  /* Gate table */
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+  th{background:var(--columbia-light);color:var(--navy);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  tr:last-child td{border-bottom:none}
+  td code{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
+  footer{margin-top:40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:16px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  footer b{color:var(--gold)}
 </style>
 </head>
 <body>
-<div class="page">
+  <header class="hero">
+    <div class="wrap">
+      <div class="logo">🦁</div>
+      <div>
+        <h1>MatMind · SDLC Pipeline</h1>
+        <div class="sub">FROM IDEA TO PRODUCTION — HOW WE SHIP</div>
+      </div>
+      <div class="pill">Conversational-first PWA</div>
+    </div>
+  </header>
 
-  <div class="header">
-    <h1>MatMind SDLC pipeline</h1>
-    <p>AI-native development lifecycle with Claude Chat, Code, and Cowork</p>
-    <div class="badge">Optimized for Claude Code session limits</div>
+  <div class="wrap">
+    <p class="lead">
+      MatMind moves work through five stages, each with a concrete artifact in this
+      repo. AI agents accelerate two of them — <b>story generation</b> and
+      <b>regression QA</b> — but every change still ships behind a written story and
+      passes the QA checklist. Stack: <b>React + Vite PWA</b>, <b>Supabase/Postgres
+      + RLS</b>, <b>Claude Haiku 4.5</b> on Vercel serverless, SendGrid, Twilio, Web Push.
+    </p>
+
+    <h2 class="section">The Pipeline</h2>
+    <div class="pipe">
+      <div class="stage"><div class="n">1</div><div class="ic">🗂️</div>
+        <h3>Backlog</h3>
+        <p>Prioritized features (P0–P3) tied to the product vision.</p>
+        <div class="art"><a href="backlog/feature-list.md">feature-list.md</a></div>
+      </div>
+      <div class="stage"><div class="n">2</div><div class="ic">📝</div>
+        <h3>Story Generation</h3>
+        <p>AI expands a feature into an acceptance-tested story.</p>
+        <div class="art">
+          <a href="backlog/cowork-story-generator-prompt.md">story prompt</a>
+          <a href="backlog/stories/">/stories</a>
+        </div>
+      </div>
+      <div class="stage"><div class="n">3</div><div class="ic">⚙️</div>
+        <h3>Development</h3>
+        <p>Branch → build → verify in a real browser → PR.</p>
+        <div class="art"><span>migrations + code</span><span>GitHub PR</span></div>
+      </div>
+      <div class="stage"><div class="n">4</div><div class="ic">🧪</div>
+        <h3>QA</h3>
+        <p>Agent drives the app through the 90-case checklist.</p>
+        <div class="art">
+          <a href="qa/test-checklist.md">checklist</a>
+          <a href="qa/cowork-qa-prompt.md">QA prompt</a>
+          <a href="qa/reports/">/reports</a>
+        </div>
+      </div>
+      <div class="stage"><div class="n">5</div><div class="ic">🚀</div>
+        <h3>Deploy</h3>
+        <p>Vercel auto-deploys <code>main</code>; migrations run in Supabase.</p>
+        <div class="art"><span>Vercel</span><span>Supabase</span></div>
+      </div>
+    </div>
+    <div class="arrow-row">
+      <div class="arrow">→</div><div class="arrow">→</div><div class="arrow">→</div><div class="arrow">→</div><div class="arrow"></div>
+    </div>
+
+    <h2 class="section">Quality Gates</h2>
+    <table>
+      <tr><th>Gate</th><th>When</th><th>Pass condition</th></tr>
+      <tr><td>Story complete</td><td>Before code</td><td>Acceptance criteria are runtime-observable; multi-tenancy + RLS addressed</td></tr>
+      <tr><td>Migrations lead deploys</td><td>Pre-merge</td><td>Schema change applied before/with code that reads it (e.g. <code>edited_at</code> before the messages query)</td></tr>
+      <tr><td>Real-browser verify</td><td>Pre-merge</td><td>Change demoed by driving the app — not just unit tests</td></tr>
+      <tr><td>Tenant isolation</td><td>Every release</td><td>No cross-team data access (AUTH-07) — a hard blocker</td></tr>
+      <tr><td>Regression QA</td><td>Pre-prod</td><td>90-case checklist green; report committed to <code>/reports</code></td></tr>
+      <tr><td>Update reaches devices</td><td>Post-deploy</td><td>SW activates new build (PWA-03); no stale cache</td></tr>
+    </table>
+
+    <h2 class="section">Who Does What</h2>
+    <div class="cards">
+      <div class="card"><h4>🧑‍🏫 Product / Coach-owner</h4><ul>
+        <li>Owns the backlog &amp; priorities</li>
+        <li>Approves side-effectful tests (email/SMS/invites)</li>
+        <li>Signs off on releases</li>
+      </ul></div>
+      <div class="card"><h4>🤖 Story Agent (Cowork)</h4><ul>
+        <li>Feature → structured story</li>
+        <li>Writes acceptance criteria &amp; test cases</li>
+        <li>Flags risks &amp; dependencies</li>
+      </ul></div>
+      <div class="card"><h4>🧪 QA Agent (Cowork)</h4><ul>
+        <li>Drives the deployed app</li>
+        <li>Runs the checklist, captures evidence</li>
+        <li>Files bugs, writes the report</li>
+      </ul></div>
+    </div>
+
+    <h2 class="section">Operating Principles</h2>
+    <div class="principles">
+      <div class="prin"><b>The AI is the app.</b><span>Conversational-first input; dashboards for context only.</span></div>
+      <div class="prin"><b>Multi-tenant by default.</b><span><code>team_id</code> + RLS on every table; isolation is non-negotiable.</span></div>
+      <div class="prin"><b>Skill-based groups.</b><span>Beginner/Advanced are skill tiers, never age brackets.</span></div>
+      <div class="prin"><b>Confirm before side effects.</b><span>The AI never sends, posts, or deletes without explicit confirmation.</span></div>
+      <div class="prin"><b>Verify at the surface.</b><span>Truth is the running app, observed through its real UI.</span></div>
+      <div class="prin"><b>Migrations lead code.</b><span>Schema lands before the code that depends on it.</span></div>
+    </div>
+
+    <footer>
+      <span>MatMind — AI-powered team management for youth wrestling.</span>
+      <span>Built for Lovett Wrestling <b>🦁</b> · Powered by Claude</span>
+    </footer>
   </div>
-
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#7F77DD"></div>Claude Chat — planning</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#1D9E75"></div>Cowork — automation</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#378ADD"></div>Claude Code — implementation</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#888780"></div>Infrastructure — GitHub / Vercel</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#BA7517"></div>Human gate — approval</div>
-  </div>
-
-  <div class="pipeline">
-
-    <!-- PLAN -->
-    <div class="phase-section">
-      <div class="phase-label">
-        <span style="color:#7F77DD">Plan</span><hr>
-      </div>
-      <div class="stage-row">
-        <div class="stage-card purple">
-          <div class="stage-num" style="color:#7F77DD">01</div>
-          <div class="stage-title">Feature planning</div>
-          <div class="stage-tool" style="color:#7F77DD">Claude Chat</div>
-          <div class="stage-desc">Brainstorm features, define scope, architecture decisions. Output: prioritized feature list with acceptance criteria.</div>
-          <div class="stage-tip" style="background:rgba(127,119,221,0.08); color:#AFA9EC;">No session limits. Use chat for all planning to preserve Code sessions for implementation.</div>
-        </div>
-        <div class="stage-card teal">
-          <div class="stage-num" style="color:#1D9E75">02</div>
-          <div class="stage-title">Story + prompt generation</div>
-          <div class="stage-tool" style="color:#1D9E75">Cowork (scheduled)</div>
-          <div class="stage-desc">Reads feature list, generates user stories with acceptance criteria and scoped dev prompts for Claude Code. References CLAUDE.md and existing code.</div>
-          <div class="stage-tip" style="background:rgba(29,158,117,0.08); color:#5DCAA5;">Better prompts = fewer Code messages burned. CRON: on demand or weekly sprint cadence.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="arrow-row"><svg viewBox="0 0 24 24" fill="none" stroke="#3D4B66" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
-
-    <!-- BUILD -->
-    <div class="phase-section">
-      <div class="phase-label">
-        <span style="color:#378ADD">Build</span><hr>
-      </div>
-      <div class="stage-row">
-        <div class="stage-card blue">
-          <div class="stage-num" style="color:#378ADD">03</div>
-          <div class="stage-title">Development</div>
-          <div class="stage-tool" style="color:#378ADD">Claude Code</div>
-          <div class="stage-desc">One story per session. Paste the Cowork-generated dev prompt, implement, commit. Push to dev branch when complete.</div>
-          <div class="stage-tip" style="background:rgba(55,138,221,0.08); color:#85B7EB;">1 story = 1 session. If a story needs 2 sessions, break it down. Start each session with "Read CLAUDE.md".</div>
-        </div>
-        <div class="stage-card gray">
-          <div class="stage-num" style="color:#888780">04</div>
-          <div class="stage-title">Push to dev + preview deploy</div>
-          <div class="stage-tool" style="color:#888780">GitHub + Vercel (auto)</div>
-          <div class="stage-desc">Code commits to dev branch. Vercel auto-creates a preview deployment with a unique URL. Live in ~60 seconds.</div>
-          <div class="stage-tip" style="background:rgba(136,135,128,0.08); color:#B4B2A9;">Branch strategy: main = prod, dev = staging. Never push directly to main.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="arrow-row"><svg viewBox="0 0 24 24" fill="none" stroke="#3D4B66" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
-
-    <!-- TEST -->
-    <div class="phase-section">
-      <div class="phase-label">
-        <span style="color:#1D9E75">Test</span><hr>
-      </div>
-      <div class="stage-row">
-        <div class="stage-card teal">
-          <div class="stage-num" style="color:#1D9E75">05</div>
-          <div class="stage-title">Regression testing</div>
-          <div class="stage-tool" style="color:#1D9E75">Cowork (CRON agent)</div>
-          <div class="stage-desc">Automated test agent runs full regression: login, chat, channels, schedule, roster, RSVP, AI responses. Outputs pass/fail report with evidence.</div>
-          <div class="stage-tip" style="background:rgba(29,158,117,0.08); color:#5DCAA5;">The session-saver. Runs independently — no Code sessions consumed. Schedule after every push or nightly.</div>
-        </div>
-        <div class="stage-card amber">
-          <div class="stage-num" style="color:#BA7517">06</div>
-          <div class="stage-title">Review results</div>
-          <div class="stage-tool" style="color:#BA7517">Human gate</div>
-          <div class="stage-desc">Review the Cowork test report. If bugs found, log as GitHub Issues with repro steps, expected vs actual, and severity. If clean, proceed to ship.</div>
-          <div class="stage-tip" style="background:rgba(186,117,23,0.08); color:#EF9F27;">Automated testing catches regressions. Human review catches "this doesn't feel right." Both matter.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="arrow-row"><svg viewBox="0 0 24 24" fill="none" stroke="#3D4B66" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
-
-    <!-- FIX -->
-    <div class="phase-section">
-      <div class="phase-label">
-        <span style="color:#D85A30">Fix (if needed)</span><hr>
-      </div>
-      <div class="stage-row">
-        <div class="stage-card blue">
-          <div class="stage-num" style="color:#378ADD">07</div>
-          <div class="stage-title">Bug fixes</div>
-          <div class="stage-tool" style="color:#378ADD">Claude Code</div>
-          <div class="stage-desc">Work from GitHub Issues. Each bug is a focused session: read the issue, fix, push to dev. One bug per session when possible.</div>
-          <div class="stage-tip" style="background:rgba(55,138,221,0.08); color:#85B7EB;">Paste the GitHub Issue directly into Code — it has repro steps and expected behavior. Pre-diagnosed bugs = fast fixes.</div>
-        </div>
-        <div class="stage-card teal">
-          <div class="stage-num" style="color:#1D9E75">08</div>
-          <div class="stage-title">Retest</div>
-          <div class="stage-tool" style="color:#1D9E75">Cowork (on demand)</div>
-          <div class="stage-desc">After fixes land on dev, trigger regression suite again. Verify fix works and nothing else broke. Repeat until clean.</div>
-          <div class="stage-tip" style="background:rgba(29,158,117,0.08); color:#5DCAA5;">The Code→Cowork loop: Code fixes, Cowork validates. Code stays focused on implementation, never on testing.</div>
-        </div>
-      </div>
-      <div class="loop-indicator">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D85A30" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
-        <span>Loop until all tests pass</span>
-      </div>
-    </div>
-
-    <div class="arrow-row"><svg viewBox="0 0 24 24" fill="none" stroke="#3D4B66" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
-
-    <!-- SHIP -->
-    <div class="phase-section">
-      <div class="phase-label">
-        <span style="color:#BA7517">Ship</span><hr>
-      </div>
-      <div class="stage-row">
-        <div class="stage-card amber">
-          <div class="stage-num" style="color:#BA7517">09</div>
-          <div class="stage-title">Approve and merge</div>
-          <div class="stage-tool" style="color:#BA7517">Human gate</div>
-          <div class="stage-desc">Create PR from dev → main. Review the diff, approve, merge. Last human checkpoint before production.</div>
-          <div class="stage-tip" style="background:rgba(186,117,23,0.08); color:#EF9F27;">PR descriptions should summarize changes and link to stories/issues resolved.</div>
-        </div>
-        <div class="stage-card gray">
-          <div class="stage-num" style="color:#888780">10</div>
-          <div class="stage-title">Production deploy</div>
-          <div class="stage-tool" style="color:#888780">Vercel (automatic)</div>
-          <div class="stage-desc">Merge to main triggers production deployment. Live in ~60 seconds. Zero downtime. Automatic rollback if build fails.</div>
-          <div class="stage-tip" style="background:rgba(136,135,128,0.08); color:#B4B2A9;">If something breaks in prod, revert the merge on GitHub. Vercel auto-deploys the previous version.</div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- SESSION STRATEGY -->
-  <div class="session-strategy">
-    <h3>Session limit strategy</h3>
-    <div class="strategy-grid">
-      <div class="strategy-item">
-        <div class="metric" style="color:#7F77DD">0</div>
-        <h4>Code sessions for planning</h4>
-        <p>All planning, brainstorming, and architecture stays in Claude Chat. Unlimited usage, no sessions consumed.</p>
-      </div>
-      <div class="strategy-item">
-        <div class="metric" style="color:#1D9E75">0</div>
-        <h4>Code sessions for testing</h4>
-        <p>Cowork handles all regression testing on a CRON schedule. Code never runs tests — it only fixes pre-diagnosed bugs.</p>
-      </div>
-      <div class="strategy-item">
-        <div class="metric" style="color:#378ADD">1:1</div>
-        <h4>Story-to-session ratio</h4>
-        <p>One story per Code session. If a story needs two sessions, it's too big — break it down before starting.</p>
-      </div>
-      <div class="strategy-item">
-        <div class="metric" style="color:#BA7517">2</div>
-        <h4>Human gates per cycle</h4>
-        <p>Review test results (go/no-go) and approve the PR (merge to prod). You stay in control without being in the loop for every step.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer">
-    <p>MatMind SDLC Pipeline v1.0 — Joey Kusky — Built with Claude AI</p>
-  </div>
-
-</div>
 </body>
 </html>

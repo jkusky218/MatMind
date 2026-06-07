@@ -1,115 +1,93 @@
-# Cowork QA Agent — Setup Instructions
+# QA Agent — Setup Instructions
 
-## Overview
-
-This guide walks you through setting up an automated QA testing agent in Claude Cowork that tests MatMind after every code push. The agent runs independently of Claude Code, preserving your Code session limits for development only.
-
----
-
-## Step 1: Create the Cowork project
-
-1. Open **Claude Cowork** (claude.ai → Cowork)
-2. Click **New Project**
-3. Name it: `MatMind QA Agent`
-4. Add the MatMind project folder as a source (~/Projects/matmind)
-
-## Step 2: Add the QA prompt
-
-1. In the Cowork project, open the task/prompt editor
-2. Copy the entire contents of `docs/qa/cowork-qa-prompt.md` and paste it as the project prompt
-3. This gives the agent full context on what to test and how to report
-
-## Step 3: Add reference files
-
-Make sure the Cowork project can access these files from your MatMind repo:
-- `CLAUDE.md` — project context
-- `docs/qa/test-checklist.md` — detailed test cases
-- `docs/qa/cowork-qa-prompt.md` — the agent prompt
-- `supabase/migrations/001_initial_schema.sql` — database schema
-
-## Step 4: Configure the schedule
-
-Set up the Cowork project to run on a schedule:
-
-### Option A: After every push (recommended for active development)
-- Trigger: When you push to the `dev` branch
-- How: After pushing code in Claude Code, open Cowork and run the QA agent manually
-- Best for: Active sprint development when you're making daily changes
-
-### Option B: Nightly (recommended for stable periods)
-- Trigger: Daily at a set time (e.g., 8:00 AM)
-- How: Set a daily recurring task in Cowork
-- Best for: Maintenance mode when changes are less frequent
-
-### Option C: On-demand (recommended for bug fix cycles)
-- Trigger: You manually kick it off
-- How: Open the Cowork project and say "Run the full regression test"
-- Best for: After a batch of bug fixes, before merging to main
-
-## Step 5: Review the output
-
-After each run, the agent produces a test report. Review it for:
-1. **Critical failures** — these block deployment, fix immediately
-2. **Failed tests** — log as GitHub Issues with the details from the report
-3. **Warnings** — address before next release but not blockers
-4. **Passed tests** — confirm coverage is adequate
-
-## Step 6: Feed bugs back to Claude Code
-
-For each failed test, create a GitHub Issue:
-
-```markdown
-## Bug: [Test name that failed]
-
-**Source**: QA Agent test report — [date]
-**Severity**: [Critical/High/Medium/Low]
-
-### Expected behavior
-[From the test report]
-
-### Actual behavior
-[From the test report]
-
-### File reference
-[From the test report]
-
-### Steps to reproduce
-1. [step]
-2. [step]
-3. [step]
-```
-
-Then in Claude Code, paste the issue and say:
-> "Fix this bug: [paste GitHub Issue]. Push to dev when fixed."
-
-After the fix, re-run the Cowork QA agent to verify.
+How to stand up the automated QA agent that runs `test-checklist.md` against a
+deployed MatMind build and writes reports to `docs/qa/reports/`.
 
 ---
 
-## The full cycle
+## 1. Prerequisites
 
-```
-You plan features (Chat)
-    ↓
-Cowork generates stories + dev prompts
-    ↓
-Claude Code implements (1 story = 1 session)
-    ↓
-Push to dev branch → Vercel preview deploys
-    ↓
-Cowork QA Agent runs regression tests
-    ↓
-You review the test report
-    ↓
-Pass? → PR to main → Vercel deploys to prod
-Fail? → GitHub Issues → Claude Code fixes → Cowork retests
-```
+- **A deployed build to test.** Default target: `https://test.mat-mind.com` (the
+  sandbox team). QA never runs against a real team without explicit approval.
+- **A test account** on the target team with the role you want to exercise. For
+  full coverage you need an **admin/super-admin** login (admin-only sections) and,
+  ideally, a **parent** login (parent-facing gating).
+- **A browser the agent can drive** — one of:
+  - **Claude-in-Chrome** (the agent controls your logged-in Chrome), or
+  - **Puppeteer/Playwright** driving system Chrome headless (good for screenshots
+    saved to disk).
+- **Two devices/sessions** if you want to verify realtime cross-device sync
+  (MSG-03) and push delivery (NOT-03) — e.g. desktop + phone, or two browser
+  profiles.
 
----
+## 2. Local vs. deployed
 
-## Tips
+| Mode | Command | Notes |
+|------|---------|-------|
+| **Demo (local)** | `npm run dev` | No Supabase env → runs on mock data (`src/lib/mockData.js`). Good for UI smoke tests; **admin/AI/realtime are not exercised** (no backend). |
+| **Deployed (real)** | visit `test.mat-mind.com` | Full stack: Supabase, Claude, realtime, push. **Use this for regression QA.** |
 
-- **Keep the test checklist updated**: When you add a new feature, add test cases to `docs/qa/test-checklist.md`. The Cowork agent reads this file every run.
-- **Don't skip human review**: The agent catches regressions. You catch "this doesn't feel right." Both matter.
-- **Batch bug fixes**: If the report shows 5 bugs, fix them all in one Code session if they're small. Then retest once.
-- **Track test history**: Save each test report in `docs/qa/reports/` with the date. This gives you a quality trend over time.
+The app is mobile-first (max-width 430px). When driving a desktop browser, set a
+mobile viewport (e.g. 390×844) so layout matches production.
+
+## 3. One-time browser setup
+
+1. Sign in to the target subdomain in the browser the agent will drive.
+2. Confirm you're on the **intended team** (check the header / team name).
+3. **Force the latest build** before testing — service workers cache aggressively.
+   In DevTools console or via the agent:
+   ```js
+   // Unregister SW + clear caches, then reload to fetch the live build
+   for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+   for (const k of await caches.keys()) await caches.delete(k);
+   location.reload();
+   ```
+   (Symptoms of a stale build: Settings missing recently-shipped sections, channel
+   AI not responding. Record as **PWA-03** if seen.)
+
+## 4. Running the QA agent
+
+1. Open a Cowork session with browser access.
+2. Paste [`cowork-qa-prompt.md`](./cowork-qa-prompt.md).
+3. Tell it the target env and which logins are available, e.g.:
+   > "Run the full regression on `test.mat-mind.com`. I'm signed in as an admin.
+   > A second phone is available for cross-device checks. Do **not** send invites,
+   > SMS, or email broadcasts."
+4. The agent walks the 90 cases, captures evidence, and writes
+   `docs/qa/reports/YYYY-MM-DD-<sha>.md`.
+5. For each ❌, it files a bug using `.github/ISSUE_TEMPLATE/bug.md`.
+
+## 5. Scope guardrails (important)
+
+These actions reach real people — the agent must get **explicit per-run approval**:
+- Sending **invites** (add coach/athlete creates real invite emails)
+- **Password reset** emails
+- **Email broadcasts** (SendGrid) and **SMS** (Twilio)
+
+Safe-by-default on the test team: posting test messages, creating/editing/deleting
+test events and messages, toggling settings, KB URL import (then discard).
+
+## 6. Environment variables (for reference)
+
+QA doesn't set these (they live in Vercel), but failures often trace back to them:
+
+| Var | Powers |
+|-----|--------|
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | client data + auth |
+| `SUPABASE_SERVICE_ROLE_KEY` | `/api/admin`, `/api/notify`, `/api/team` (server only) |
+| `VITE_ROOT_DOMAIN` | subdomain → team resolution (must be `mat-mind.com`) |
+| `ANTHROPIC_API_KEY` | `/api/chat` (Claude Haiku) |
+| `VITE_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Web Push |
+| `SENDGRID_API_KEY` | email broadcasts (when built) |
+| `TWILIO_*` | SMS (when built) |
+
+Also verify in the **Supabase dashboard**: redirect URLs include
+`https://*.mat-mind.com/**`; `messages` is in the `supabase_realtime` publication;
+the `channel-files` storage bucket exists.
+
+## 7. Cadence
+
+- Run the **full checklist** before every release / production deploy.
+- Run an **affected-area subset** on each story merge.
+- Keep reports in `docs/qa/reports/` so trends (flaky areas, recurring fails) are
+  visible over time.

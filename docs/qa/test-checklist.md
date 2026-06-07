@@ -1,244 +1,157 @@
-# MatMind QA Test Checklist
+# MatMind — QA Test Checklist
 
-## Test Environment
-- **Preview URL**: [Vercel preview URL — update per deployment]
-- **Test Coach Account**: joey.kusky@gmail.com
-- **Test Parent Account**: [create a test parent account in Supabase]
-- **Browser**: Chrome (latest)
-- **Date**: [auto-fill]
-
----
-
-## 1. Authentication
-
-### 1.1 Coach login
-- [ ] Navigate to preview URL
-- [ ] Login screen renders with MatMind branding (navy gradient, columbia blue accents)
-- [ ] Coach/Parent role selector works
-- [ ] Enter coach credentials and sign in
-- [ ] Redirects to main app with "Coach" role displayed in header
-- [ ] Sign out button works and returns to login screen
-
-### 1.2 Parent login
-- [ ] Select "Parent" role
-- [ ] Enter parent credentials and sign in
-- [ ] Redirects to main app with "Parent" role displayed
-- [ ] Parent cannot see Coaches Only channel
-- [ ] Parent cannot see MatMind AI command center
-
-### 1.3 Auth edge cases
-- [ ] Invalid email shows error message
-- [ ] Wrong password shows error message
-- [ ] Empty fields prevented from submitting
-- [ ] Session persists on page refresh
-- [ ] Sign out clears session completely
+> Regression checklist run against a deployed build (default: `test.mat-mind.com`)
+> before every release. 90 cases across 9 categories. IDs are stable — reference
+> them in bug reports and stories.
+>
+> **Result key:** ✅ Pass · ❌ Fail · ⚠️ Pass-with-issue · ⏭️ Skipped · 🚫 Blocked
+>
+> Run as a human or via the QA agent (`cowork-qa-prompt.md`). Always test through
+> the real UI (click buttons, type messages) — not by calling APIs underneath.
 
 ---
 
-## 2. Messages Tab — Channel List
+## 1. Auth & Multi-tenancy
 
-### 2.1 Channel list rendering
-- [ ] Messages tab is active by default after login
-- [ ] MatMind AI card renders at top with navy gradient and "Private" badge
-- [ ] Team channels section header shows "Team channels"
-- [ ] All 5 channels render: Announcements, Advanced, Beginner, Tots, Coaches Only
-- [ ] Each channel shows correct icon (megaphone, hash, lock)
-- [ ] Last message preview shows for each channel
-- [ ] Unread indicators display correctly
+| ID | Case | Expected |
+|----|------|----------|
+| AUTH-01 | Load `<slug>.mat-mind.com` (incognito) | Login screen branded with that team's name/colors/logo |
+| AUTH-02 | Load an unknown subdomain | "Team not found" screen |
+| AUTH-03 | Sign in with valid credentials | Lands in app scoped to the correct team |
+| AUTH-04 | Sign in with wrong password | Clear error; no session created |
+| AUTH-05 | "Forgot password?" → submit email | "Check your email" confirmation; wording doesn't reveal if account exists |
+| AUTH-06 | Open recovery link from email | Lands on set-password screen on the correct subdomain |
+| AUTH-07 | Cross-tenant isolation | Team A user cannot see Team B roster/events/messages (RLS) |
+| AUTH-08 | Session persistence | Refreshing the page keeps the user signed in |
+| AUTH-09 | Sign out | Returns to login; protected views inaccessible |
+| AUTH-10 | Super admin visits a second subdomain | Auto-scopes to that team with admin access; no data leakage |
 
-### 2.2 Channel navigation
-- [ ] Tapping MatMind AI opens the AI command center
-- [ ] Tapping any team channel opens that channel thread
-- [ ] Back button returns to channel list
-- [ ] Header and tab bar hide when inside a channel thread
-- [ ] Header and tab bar reappear when returning to channel list
+## 2. AI Command Center (private MatMind AI channel)
 
----
+| ID | Case | Expected |
+|----|------|----------|
+| AI-01 | Open MatMind AI channel | Greeting reads live counts (events/confirmations); green "connected" dot |
+| AI-02 | Ask "How many athletes per group?" | Accurate answer from live roster |
+| AI-03 | "Add practice Thursday at 6pm for beginners" | Event created; correct title/date/time/group/location |
+| AI-04 | Recurring: "every Monday in June at 6pm" | One event per date, all Mondays in June |
+| AI-05 | Multi-group: "Beginner and Advanced practice Tuesday" | Event targets both groups |
+| AI-06 | "Who's confirmed for the next tournament?" | Availability summary matches data |
+| AI-07 | "Post our top attendance leaders to #Announcements" | Composes + posts a leaderboard to the channel |
+| AI-08 | Ambiguous/garbage input | Graceful clarification, no crash, no bogus event |
+| AI-09 | Network/API failure | Friendly error; typing indicator clears (no infinite spinner) |
+| AI-10 | Response latency | First token / completion within a reasonable time; UI stays responsive |
 
-## 3. MatMind AI (Command Center)
+## 3. Channels & Messaging
 
-### 3.1 AI chat basics
-- [ ] Opening message renders with team snapshot
-- [ ] "Try asking" quick action buttons display
-- [ ] Tapping a quick action populates the input field
-- [ ] Typing a message and hitting Enter sends it
-- [ ] Send button enables/disables based on input content
-- [ ] User messages appear right-aligned in navy bubbles
-- [ ] AI responses appear left-aligned with brain icon
-- [ ] Typing indicator (bouncing dots) shows while AI processes
+| ID | Case | Expected |
+|----|------|----------|
+| MSG-01 | Channel list renders | AI card + Announcements/Advanced/Beginner/Tots |
+| MSG-02 | Post a message | Appears instantly for sender |
+| MSG-03 | Cross-device sync | Message appears on a second device within ~1s (realtime) |
+| MSG-04 | Edit own message | Inline edit; "· edited" badge after save |
+| MSG-05 | Delete own message | Removed instantly on all devices |
+| MSG-06 | Coach moderates others' message | Coach/admin can delete any message; parents cannot |
+| MSG-07 | Attach an image | Renders inline; tap opens full size |
+| MSG-08 | Attach a PDF | Renders as a download chip with name + size |
+| MSG-09 | AI auto-reply (Smart mode) — real question | AI answers concisely, no filler follow-up |
+| MSG-10 | AI auto-reply — casual statement | AI stays silent (no "?" → no reply) |
+| MSG-11 | AI does not hijack person-directed msg | "Joey, can you …?" → AI silent |
+| MSG-12 | `@MatMind …` mention | AI replies even without a question mark |
+| MSG-13 | History persists | Reopen channel / refresh → history intact (no blanking) |
 
-### 3.2 AI response quality
-- [ ] "What's this week?" returns upcoming events
-- [ ] "Who's confirmed for [event]?" returns availability breakdown
-- [ ] "How many athletes?" returns roster count by group
-- [ ] "[Name] is sick, pull from Saturday" updates availability and confirms actions
-- [ ] "Add practice Wednesday 5pm" creates an event
-- [ ] "Send a reminder to beginner parents" drafts a message with recipient count
-- [ ] AI understands group names: Tots, Beginner, Advanced, Coaches
+## 4. Schedule & Events
 
-### 3.3 AI action verification
-- [ ] When AI marks an athlete unavailable, availability data actually updates
-- [ ] When AI adds an event, it appears in the Schedule tab
-- [ ] Action items display with checkmark icons
-- [ ] Follow-up suggestions render in a highlighted box
+| ID | Case | Expected |
+|----|------|----------|
+| SCH-01 | Schedule tab renders | Upcoming events sorted by date with type/group badges |
+| SCH-02 | Type filter (Practice/Competition) | List narrows correctly; count updates |
+| SCH-03 | Group filter | Shows group events + all-group events |
+| SCH-04 | Expand event | Availability summary (confirmed/declined/pending) |
+| SCH-05 | Parent RSVP "Going" | Persists; reflected in coach availability summary |
+| SCH-06 | Parent RSVP "Can't make it" | Persists; toggling off reverts to pending |
+| SCH-07 | Coach "Take Attendance" | Mark present/absent persists; progress bar updates |
+| SCH-08 | Multi-group event eligibility | Only athletes in targeted groups appear |
+| SCH-09 | Empty/filtered states | Sensible "no events" messaging |
+| SCH-10 | Past events excluded | Only today-forward events shown |
 
----
+## 5. Roster & Contacts
 
-## 4. Team Channels
+| ID | Case | Expected |
+|----|------|----------|
+| ROS-01 | Roster renders | Members grouped; counts on filter pills |
+| ROS-02 | Multi-select group filters | Toggle groups on/off; visible count matches |
+| ROS-03 | Parents filter | Parents listed separately; off by default |
+| ROS-04 | Expand athlete | Parent/guardian 1 & 2 contact blocks |
+| ROS-05 | Tap email | Opens mail client (`mailto:`) with address |
+| ROS-06 | Tap phone | Initiates call (`tel:`); formatting stripped to digits |
+| ROS-07 | Coach card | Title + contact info shown; star avatar |
+| ROS-08 | Add athlete (admin) | Athlete added to group; parent(s) auto-invited |
+| ROS-09 | Add coach (admin) | Invite email sent; appears in roster |
+| ROS-10 | Skill-based groups | Beginner/Advanced are skill tiers, not age-derived |
 
-### 4.1 Channel thread rendering
-- [ ] Channel header shows channel name, icon, and description
-- [ ] Private channels show lock icon and "Private" badge
-- [ ] Existing messages render in correct order
-- [ ] Coach messages show sender name with "Coach" label
-- [ ] Parent messages show sender name
-- [ ] AI messages show MatMind AI branding
-- [ ] Pinned messages show pin indicator
-- [ ] Timestamps display on messages
+## 6. Knowledge Base
 
-### 4.2 Posting messages
-- [ ] Text input field renders at bottom of channel
-- [ ] Placeholder text matches channel name
-- [ ] Typing and sending a message adds it to the thread
-- [ ] New messages auto-scroll into view
-- [ ] Message appears immediately (optimistic update)
+| ID | Case | Expected |
+|----|------|----------|
+| KB-01 | KB tab renders | Entries with category counts |
+| KB-02 | Default install article | "How to Install MatMind" present for every team |
+| KB-03 | Add via Type Content | Entry saved with chosen category |
+| KB-04 | Import from URL | Fetches page text; title auto-filled; source banner |
+| KB-05 | Review & trim before save | Editable title + content; save persists |
+| KB-06 | Refresh from source | Re-fetches and updates an imported entry |
+| KB-07 | Delete entry | Removed from list |
+| KB-08 | AI uses KB | Channel/AI answer cites KB content (e.g. tournament weigh-in times) |
+| KB-09 | Category filters | Filter by Tournament/Policy/FAQ/Other works |
 
-### 4.3 Channel-specific checks
-- [ ] Announcements: coach can post, all members can read
-- [ ] Advanced: shows only advanced group content
-- [ ] Beginner: shows only beginner group content, AI auto-responds to parent questions
-- [ ] Tots: shows only tots group content
-- [ ] Coaches Only: only visible to coaches, not parents
+## 7. Notifications
 
----
+| ID | Case | Expected |
+|----|------|----------|
+| NOT-01 | "Enable Notifications" banner | Prompts permission; subscribes on grant |
+| NOT-02 | Send test notification | Arrives on the subscribing device |
+| NOT-03 | Channel post → push | Subscribers (not the sender) receive a push |
+| NOT-04 | Per-channel mute | Muted channel produces no push |
+| NOT-05 | Dynamic channel list | Notification toggles reflect current roster groups |
+| NOT-06 | iOS specifics | Requires 16.4+, home-screen install; banner only when app backgrounded |
+| NOT-07 | Stale subscription cleanup | 410 responses remove dead subscriptions server-side |
+| NOT-08 | Sender exclusion | You don't get notified for your own posts |
 
-## 5. Schedule Tab
+## 8. Settings & Admin
 
-### 5.1 Schedule rendering
-- [ ] Schedule tab shows event count
-- [ ] Events render in chronological order
-- [ ] Each event shows: date block, type badge, group badge, title, time, location
-- [ ] Event type badges: Practice (green), Tournament (gold), Match (blue)
-- [ ] Group badges display with correct colors (Advanced=navy, Beginner=columbia, Tots=purple)
-- [ ] "All" group events show no group badge
+| ID | Case | Expected |
+|----|------|----------|
+| SET-01 | Account section | Name, role badge, email, team shown |
+| SET-02 | Edit team name (admin) | Persists; header updates |
+| SET-03 | Edit colors (admin) | Primary/secondary apply app-wide |
+| SET-04 | Logo upload (admin) | Saves; shown in header + login |
+| SET-05 | Roster groups (admin) | Add/remove groups persists; Coaches not removable |
+| SET-06 | AI Assistant mode (admin) | Off / Mentions / Smart toggles and persists; governs channel AI |
+| SET-07 | Member management list | Coaches/parents/admins with status (active/pending) |
+| SET-08 | Promote/demote role | Role pill changes role; cannot self-demote |
+| SET-09 | Send password reset (admin) | Reset email sent to that member |
+| SET-10 | Non-admin gating | Parents/coaches don't see admin-only sections |
 
-### 5.2 Event expansion
-- [ ] Tapping an event expands to show availability
-- [ ] Availability shows confirmed/declined/pending counts
-- [ ] Progress bar renders correctly (navy for confirmed, red for declined)
-- [ ] Tapping again collapses the event
-- [ ] Only one event expanded at a time
+## 9. PWA, Performance & Cross-Cutting
 
-### 5.3 Schedule data integrity
-- [ ] Events added via AI chat appear in schedule
-- [ ] Availability changes from AI chat reflect in schedule
-- [ ] Event dates and times display correctly
-- [ ] Location information is accurate
-
----
-
-## 6. Roster Tab
-
-### 6.1 Roster rendering
-- [ ] Roster tab shows total member count
-- [ ] Filter pills render: All, Coaches, Advanced, Beginner, Tots
-- [ ] Each filter shows correct count in parentheses
-- [ ] Default view shows all members sorted by group then weight
-
-### 6.2 Roster filtering
-- [ ] Tapping "Coaches" filters to coaching staff only
-- [ ] Tapping "Advanced" filters to advanced wrestlers only
-- [ ] Tapping "Beginner" filters to beginner wrestlers only
-- [ ] Tapping "Tots" filters to tots wrestlers only
-- [ ] Tapping "All" resets the filter
-- [ ] Active filter pill is highlighted with group color
-
-### 6.3 Athlete cards
-- [ ] Each athlete shows: avatar (initials or star for coaches), name, weight, grade, group badge
-- [ ] Coaches show role instead of weight/grade
-- [ ] Coach avatars show gold star icon
-- [ ] Group badges show correct color
-- [ ] Athletes sorted by weight within their group
-
-### 6.4 Expanded athlete details
-- [ ] Tapping an athlete expands their card
-- [ ] School name displays with school icon
-- [ ] Parent/Guardian 1 shows name, email, phone
-- [ ] Parent/Guardian 2 shows name, email, phone (if on file)
-- [ ] Missing second parent shows "No second parent/guardian on file"
-- [ ] Coach cards show contact info without parent labels
-- [ ] Tapping again collapses the card
-
----
-
-## 7. Responsive / Mobile
-
-### 7.1 Mobile viewport
-- [ ] App constrains to 430px max-width
-- [ ] All text is readable at mobile size
-- [ ] Touch targets are at least 44px
-- [ ] Scrolling works smoothly in all tabs
-- [ ] Chat input doesn't get hidden behind keyboard
-- [ ] No horizontal scrolling occurs
-
-### 7.2 PWA functionality
-- [ ] App loads on mobile browser
-- [ ] "Add to Home Screen" prompt appears (or manual add works)
-- [ ] Installed app opens in standalone mode (no browser chrome)
-- [ ] App icon and splash screen show MatMind branding
-- [ ] App works offline for cached content (if implemented)
+| ID | Case | Expected |
+|----|------|----------|
+| PWA-01 | Install to home screen | Installs; opens standalone |
+| PWA-02 | Service worker update | New build activates; "Update available" banner appears |
+| PWA-03 | No stale cache | Latest deploy reaches the device (skipWaiting on install) |
+| PWA-04 | Pull-to-refresh | Spinner shows; data refreshes in place (no full reload) |
+| PWA-05 | Mobile layout | 430px-max centered layout; no overflow/clipping |
+| PWA-06 | Offline read (target) | Cached schedule/roster viewable offline |
+| PWA-07 | Console clean | No uncaught errors in console during core flows |
+| PWA-08 | Branding pre-auth | Team logo/colors show on login before sign-in |
+| PWA-09 | Demo mode | `npm run dev` (no Supabase env) runs on mock data |
+| PWA-10 | Safe-area / notch | Header respects `env(safe-area-inset-*)` on notched devices |
 
 ---
 
-## 8. Visual / Branding
+## Run log template
 
-### 8.1 Lovett School colors
-- [ ] Header uses navy gradient (#0F2440 → #1B3A5C)
-- [ ] Interactive elements use columbia blue (#6BADE4)
-- [ ] Coach/tournament elements use gold (#C4A44A)
-- [ ] Group colors consistent: Coaches=gold, Advanced=navy, Beginner=columbia, Tots=purple
-- [ ] No off-brand colors appear anywhere
-
-### 8.2 Typography and spacing
-- [ ] Inter font loads correctly
-- [ ] Text hierarchy is clear (headers, body, captions)
-- [ ] Adequate spacing between elements
-- [ ] No text overflow or truncation issues
-
----
-
-## 9. Data Integrity
-
-### 9.1 Supabase connection
-- [ ] App connects to Supabase (not running in demo mode)
-- [ ] Login uses real Supabase auth
-- [ ] Roster data loads from database
-- [ ] Events data loads from database
-- [ ] Availability data loads from database
-- [ ] Channel messages load from database
-
-### 9.2 Real-time updates
-- [ ] New messages appear without page refresh (if Realtime enabled)
-- [ ] Availability changes reflect across tabs
-
----
-
-## Test Report Template
-
-### Summary
-- **Date**: 
-- **Build**: [commit hash]
-- **Preview URL**: 
-- **Tester**: Cowork QA Agent
-- **Total tests**: 
-- **Passed**: 
-- **Failed**: 
-- **Blocked**: 
-
-### Failed Tests
-| # | Test Case | Expected | Actual | Severity |
-|---|-----------|----------|--------|----------|
-|   |           |          |        |          |
-
-### Notes
-
+```
+Build: <commit sha>  Env: test.mat-mind.com  Date: <date>  Tester: <human|QA agent>
+Summary: <N> pass / <N> fail / <N> warn / <N> skip
+Failures: <ID> — <one-line> (link to bug)
+```
