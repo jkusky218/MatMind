@@ -3,29 +3,46 @@ import { isDemo } from '../lib/supabase';
 
 // ── Demo-mode local support responses ────────────────────────────────────────
 
+// Safety/abuse topics are NOT handled here — those belong with SafeSport.
+// Support only covers product questions and billing.
 const ESCALATION_PATTERNS = [
-  // Safety — stem-based, no trailing \b so inflections (bullied, abused, injured) match
-  /(hurt|injur|abus|bull(y|ied|ying)|harass|unsafe|emergency|assault|attack|threat)/i,
-  // Billing
+  // Billing / subscription
   /(billing|payment|charged|charge|refund|invoice|subscription|cancel.*plan)/i,
-  // Legal / privacy
+  // Legal / privacy / data
   /(legal|lawsuit|\bsue\b|ferpa|privacy|gdpr|data deletion|attorney|lawyer)/i,
-  // Security
+  // Account security
   /(hacked|unauthorized|breach|compromised)/i,
   // Explicit human request
   /(talk to (a |someone|a human|real)|speak to (a |someone)|human agent|real person)/i,
+];
+
+// Topics that must be redirected to SafeSport — never handled in-app
+const SAFESPORT_PATTERNS = [
+  /(abus|assault|harass|bully|bullied|bullying|unsafe|threat|hurt|injur|misconduct|inappropriate)/i,
 ];
 
 function isEscalationNeeded(text) {
   return ESCALATION_PATTERNS.some(p => p.test(text));
 }
 
+function isSafeSportTopic(text) {
+  return SAFESPORT_PATTERNS.some(p => p.test(text));
+}
+
 function generateDemoResponse(message) {
   const lower = message.toLowerCase();
 
+  // Safety and conduct concerns must go through SafeSport — not this app
+  if (isSafeSportTopic(message)) {
+    return {
+      text: "MatMind Support only handles product and billing questions. Concerns about athlete safety, misconduct, or abuse must be reported through **SafeSport** — the independent organization that handles these matters for youth sports.\n\nPlease visit **safesport.org** or contact your program administrator directly.",
+      safesport: true,
+    };
+  }
+
   if (isEscalationNeeded(message)) {
     return {
-      text: "I've flagged this for our support team and created a ticket. A real person will follow up within 1 business day. We take this seriously.",
+      text: "I've created a support ticket for you. A member of the MatMind team will follow up within 1 business day.",
       escalated: true,
     };
   }
@@ -111,6 +128,15 @@ export function useSupportChat({ auth }) {
         const result = generateDemoResponse(text);
         reply        = result.text;
         didEscalate  = result.escalated ?? false;
+        if (result.safesport) {
+          // Treat as a special non-escalation redirect — no ticket created
+          setMessages(prev => [...prev, {
+            id: Date.now() + 1, role: 'support', sender: 'MatMind Support',
+            text: reply, safesport: true, time: 'Now',
+          }]);
+          setLoading(false);
+          return;
+        }
       } else {
         // Live mode — call /api/support
         const res = await fetch('/api/support', {

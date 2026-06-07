@@ -13,17 +13,19 @@ import { createClient } from '@supabase/supabase-js';
 
 // ── Escalation detection ─────────────────────────────────────────────────────
 
+// Safety/abuse/misconduct are NOT escalated here — they belong with SafeSport.
+// This support system covers product questions and billing only.
+const SAFESPORT_PATTERN = /(abus|assault|harass|bully|bullied|bullying|unsafe|threat|hurt|injur|misconduct|inappropriate)/i;
+
 const ESCALATION_PATTERNS = [
-  // Athlete / child safety
-  { pattern: /(hurt|injur|abus|bull(y|ied|ying)|harass|unsafe|emergency|assault|attack|threat)/i, category: 'safety', severity: 'critical' },
-  // Billing
-  { pattern: /\b(billing|payment|charged|charge|refund|invoice|subscription|cancel.*plan|plan.*cancel)\b/i, category: 'billing', severity: 'high' },
-  // Legal / privacy
-  { pattern: /\b(legal|lawsuit|sue|ferpa|privacy|gdpr|data deletion|attorney|lawyer)\b/i, category: 'legal', severity: 'high' },
+  // Billing / subscription
+  { pattern: /(billing|payment|charged|charge|refund|invoice|subscription|cancel.*plan)/i, category: 'billing', severity: 'high' },
+  // Legal / privacy / data
+  { pattern: /(legal|lawsuit|\bsue\b|ferpa|privacy|gdpr|data deletion|attorney|lawyer)/i, category: 'legal', severity: 'high' },
   // Account security
-  { pattern: /\b(hacked|unauthorized|breach|compromised|someone else.*account)\b/i, category: 'security', severity: 'high' },
+  { pattern: /(hacked|unauthorized|breach|compromised|someone else.*account)/i, category: 'security', severity: 'high' },
   // Explicit human request
-  { pattern: /\b(talk to (a |someone|a human|real)|speak to (a |someone)|human agent|real person|escalat)\b/i, category: 'human_request', severity: 'medium' },
+  { pattern: /(talk to (a |someone|a human|real)|speak to (a |someone)|human agent|real person)/i, category: 'human_request', severity: 'medium' },
 ];
 
 function detectEscalation(text) {
@@ -74,6 +76,7 @@ ${kbText}
 - You are NOT authorised to modify any data, create events, or manage rosters — direct users to the MatMind AI for that
 - Do not make up features that don't exist
 - Do not speculate on pricing, roadmap, or business decisions
+- **Never accept or process reports of athlete abuse, bullying, harassment, assault, or any safety/misconduct concern.** These matters are handled exclusively by SafeSport and must never be routed through this app. If a user raises any such topic, respond only with: "MatMind Support handles product and billing questions only. For athlete safety or misconduct concerns, please contact SafeSport at safesport.org or your program administrator."
 
 ## Escalation instructions
 If the user's message involves athlete safety, child welfare, abuse, bullying, billing disputes, legal or privacy concerns, or if they explicitly ask for a human — your response must end with exactly this JSON marker on its own line:
@@ -94,7 +97,17 @@ export default async function handler(req, res) {
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const apiKey      = process.env.ANTHROPIC_API_KEY;
 
-  // ── Step 1: immediate local escalation check (before calling Claude) ────────
+  // ── Step 1: SafeSport redirect check — return immediately, no ticket ─────────
+  if (SAFESPORT_PATTERN.test(message)) {
+    return res.status(200).json({
+      reply: "MatMind Support only handles product and billing questions. Concerns about athlete safety, misconduct, or abuse must be reported through **SafeSport** — the independent organization that handles these matters for youth sports.\n\nPlease visit **safesport.org** or contact your program administrator directly.",
+      escalated: false,
+      safesport: true,
+      ticketId:  null,
+    });
+  }
+
+  // ── Step 2: immediate local escalation check (before calling Claude) ─────────
   const escalationCheck = detectEscalation(message);
 
   // ── Step 2: load KB (skip if no Supabase configured) ────────────────────────

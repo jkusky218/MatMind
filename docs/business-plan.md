@@ -74,13 +74,19 @@ The support persona is **MatMind Support** — a distinct AI identity separate f
 | **T2 — AI Creates Ticket** | AI writes ticket, human queued | Complex issues AI can't fully resolve; user wants follow-up | < 4 hours (business hours) |
 | **T3 — Human Responds** | MatMind support staff | Auto-escalated sensitive topics; user explicitly requested human | < 1 business day |
 
+### Scope: Product & Billing Only
+MatMind Support handles **product questions and billing only**. It is not a channel for reporting athlete safety concerns, abuse, bullying, harassment, or misconduct. Those matters are governed by **SafeSport** and must follow their reporting guidelines.
+
+If a user raises any safety or conduct concern, the support AI immediately redirects them to SafeSport (`safesport.org`) and their program administrator — no ticket is created and no further engagement occurs on that topic. This boundary is enforced at every layer: the client-side pattern check, the serverless function, and the Claude system prompt.
+
 ### Auto-Escalation Triggers (always go to T3)
 The AI must immediately create a human-reviewed ticket when any of the following are detected:
-- **Athlete safety concerns** — any mention of injury, bullying, abuse, or unsafe conditions
 - **Billing disputes** — payment issues, subscription complaints, refund requests
-- **Account security** — suspected unauthorized access, password issues for a protected account
+- **Account security** — suspected unauthorized access, password compromise
 - **Legal / FERPA** — requests involving student records, privacy complaints, data deletion
 - **Explicit request** — user says "I want to talk to a person" or equivalent
+
+> **Not escalated here:** athlete safety, abuse, bullying, harassment, or misconduct. → SafeSport.
 
 ### Knowledge Base
 - The support AI's context includes a product knowledge base covering features, FAQs, and known issues.

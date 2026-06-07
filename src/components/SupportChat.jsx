@@ -78,6 +78,19 @@ function SupportBubble({ msg }) {
             </p>
           </div>
         )}
+        {/* SafeSport redirect notice */}
+        {msg.safesport && (
+          <div style={{
+            marginTop: 6, padding: '8px 12px', borderRadius: 8,
+            background: '#EFF6FF', border: '1px solid #BFDBFE',
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+          }}>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>🔗</span>
+            <p style={{ fontSize: 11, color: '#1E40AF', margin: 0, lineHeight: 1.5 }}>
+              <strong>safesport.org</strong> — U.S. Center for SafeSport
+            </p>
+          </div>
+        )}
         <p style={{ fontSize: 10, color: '#bbb', margin: '3px 0 0 2px' }}>{msg.time}</p>
       </div>
     </div>
