@@ -6,6 +6,164 @@ import { sendToMatMind } from '../lib/ai';
 import { uploadChannelFile } from '../lib/storage';
 import { isDemo } from '../lib/supabase';
 
+// ── Markdown renderer (bold + bullet lists only — enough for newsletter drafts) ─
+function RenderMarkdown({ text }) {
+  if (!text) return null;
+  return (
+    <div style={{ fontSize: 13, lineHeight: 1.7, color: '#1a1a1a' }}>
+      {text.split('\n').map((line, i) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <br key={i} />;
+        // Heading (## or ###)
+        if (/^#{2,3}\s/.test(trimmed)) {
+          const content = trimmed.replace(/^#{2,3}\s/, '');
+          return <p key={i} style={{ fontWeight: 700, fontSize: 13, margin: '10px 0 2px', color: BRAND.navy }}><InlineBold text={content} /></p>;
+        }
+        // Bullet list
+        if (/^[-•*]\s/.test(trimmed)) {
+          const content = trimmed.replace(/^[-•*]\s/, '');
+          return <p key={i} style={{ margin: '2px 0', paddingLeft: 14, position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 0, color: BRAND.columbia }}>•</span>
+            <InlineBold text={content} />
+          </p>;
+        }
+        return <p key={i} style={{ margin: '3px 0' }}><InlineBold text={line} /></p>;
+      })}
+    </div>
+  );
+}
+
+function InlineBold({ text }) {
+  return <>{text.split(/(\*\*.*?\*\*)/).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i}>{part.slice(2, -2)}</strong>
+      : <span key={i}>{part}</span>
+  )}</>;
+}
+
+// ── Newsletter draft card ──────────────────────────────────────────────────────
+const GROUP_CHANNEL_MAP = { beginner: 'beginner', advanced: 'advanced', tots: 'tots', all: 'announcements' };
+
+function NewsletterDraftCard({ draft, onPostToChannel }) {
+  const [posted,  setPosted]  = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [toast,   setToast]   = useState(null);
+
+  const groupLabels = draft.groups?.length
+    ? draft.groups.map(g => g === 'all' ? 'All Families' : GROUP_LABELS[g] ?? g).join(' + ')
+    : 'All Families';
+
+  const handlePost = async () => {
+    const channels = draft.groups?.length
+      ? draft.groups.map(g => GROUP_CHANNEL_MAP[g] ?? 'announcements')
+      : ['announcements'];
+    const uniqueChannels = [...new Set(channels)];
+    for (const ch of uniqueChannels) {
+      await onPostToChannel(ch, draft.body);
+    }
+    setPosted(true);
+    setToast('Posted to channel!');
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(`${draft.subject}\n\n${draft.body}`);
+      setCopying(true);
+      setToast('Copied to clipboard!');
+      setTimeout(() => { setCopying(false); setToast(null); }, 2000);
+    } catch {
+      setToast('Copy failed — try manually selecting the text.');
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  const handleEmail = () => {
+    setToast('Email sending coming soon — add SENDGRID_API_KEY to enable.');
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  return (
+    <div style={{ marginLeft: 36, marginBottom: 16, position: 'relative' }}>
+      {/* Card */}
+      <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${BRAND.columbia}40`, boxShadow: '0 2px 8px rgba(27,58,92,0.08)' }}>
+        {/* Header */}
+        <div style={{
+          background: `linear-gradient(135deg, ${BRAND.navyDark} 0%, ${BRAND.navy} 100%)`,
+          padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 16 }}>📧</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {draft.subject || 'Weekly Newsletter Draft'}
+            </p>
+            <p style={{ fontSize: 10, color: BRAND.columbiaMid, margin: 0 }}>
+              For: {groupLabels}
+            </p>
+          </div>
+          <div style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(196,164,74,0.25)', color: BRAND.gold, fontWeight: 700, flexShrink: 0 }}>
+            DRAFT
+          </div>
+        </div>
+
+        {/* Body preview */}
+        <div style={{
+          background: '#fafbfc', padding: '12px 14px',
+          maxHeight: 260, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          borderBottom: '1px solid #e8edf2',
+        }}>
+          <RenderMarkdown text={draft.body} />
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ background: '#fff', padding: '10px 12px', display: 'flex', gap: 6 }}>
+          <button
+            onClick={handleCopy}
+            style={{
+              flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: '#f0f4f8', border: '1px solid #e0e6ee', color: '#555',
+            }}
+          >
+            {copying ? '✓ Copied' : '📋 Copy'}
+          </button>
+          <button
+            onClick={handlePost}
+            disabled={posted}
+            style={{
+              flex: 2, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: posted ? 'default' : 'pointer',
+              background: posted ? '#e8f5e9' : BRAND.navy, border: 'none',
+              color: posted ? '#388e3c' : '#fff', transition: 'background 0.2s',
+            }}
+          >
+            {posted ? '✓ Posted' : '📣 Post to Channel'}
+          </button>
+          <button
+            onClick={handleEmail}
+            style={{
+              flex: 2, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: '#fff', border: `1px solid ${BRAND.columbia}60`, color: BRAND.navy,
+            }}
+          >
+            📧 Send Email
+          </button>
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'absolute', bottom: -32, left: 0, right: 0,
+          textAlign: 'center', fontSize: 11, color: '#555',
+          background: '#f0f4f8', borderRadius: 6, padding: '4px 10px',
+          border: '1px solid #e0e6ee',
+        }}>
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── AI trigger detection ──────────────────────────────────────────────────────
 // Returns true when a channel message should get an AI response.
 // Decides whether the AI should auto-reply to a channel message. Deliberately
@@ -199,7 +357,7 @@ async function executeIntents(message, { roster, events, createEvent, updateAvai
 // NOTE: mutations are already handled by executeIntents above, so this only
 // needs to return the conversational response text.
 
-function generateFallbackResponse(message, roster, events, availability) {
+function generateFallbackResponse(message, roster, events, availability, teamName = 'Lovett Wrestling', gymName = 'Team Gym') {
   const lower    = message.toLowerCase();
   const athletes = roster.filter(r => r.group !== 'coaches');
   const coaches  = roster.filter(r => r.group === 'coaches');
@@ -249,6 +407,63 @@ function generateFallbackResponse(message, roster, events, availability) {
       text: 'Practice added to the schedule!',
       actions: [`Added ${label}`, `Group: ${group === 'all' ? 'All groups' : GROUP_LABELS[group]}`],
       followUp: 'Want me to post an announcement to the channel?',
+    };
+  }
+
+  // ── Newsletter draft ──────────────────────────────────────────────────────
+  const isDraftNewsletter = (lower.includes('draft') || lower.includes('write') || lower.includes('generate'))
+    && (lower.includes('email') || lower.includes('newsletter') || lower.includes('weekly') || lower.includes('update'));
+
+  if (isDraftNewsletter) {
+    const group      = detectGroup(lower);
+    const groupLabel = group ? GROUP_LABELS[group] : 'All Families';
+    const groupKey   = group ?? 'all';
+    const filtered   = group ? events.filter(e => !e.groups?.length || e.groups.includes(group)) : events;
+    const upcoming   = filtered.slice(0, 6);
+
+    // Extract any custom reminders mentioned in the message
+    const reminders = [];
+    if (/shoe|shoes|wrestling shoe/i.test(message)) reminders.push('Please do **not** put on wrestling shoes until you are inside the wrestling room.');
+    if (/shower/i.test(message))                    reminders.push('Make sure your athlete **showers** when they get home after practice.');
+    if (/water|hydrat/i.test(message))              reminders.push('Bring a **water bottle** — we work hard in there!');
+
+    const eventLines = upcoming.length
+      ? upcoming.map(e => {
+          const dateStr = e.date || e.event_date || '';
+          const timeStr = e.time || e.start_time || '';
+          const loc     = e.location || e.location_name || gymName;
+          const icon    = e.type === 'tournament' ? '🏆' : e.type === 'match' ? '🤼' : '💪';
+          return `- ${icon} **${e.title}** — ${dateStr} at ${timeStr} · ${loc}`;
+        }).join('\n')
+      : '- No events currently scheduled — check back soon!';
+
+    const reminderLines = reminders.length
+      ? `\n## Important Reminders\n${reminders.map(r => `- ${r}`).join('\n')}`
+      : '';
+
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const body = `Hi ${groupLabel}! 👋
+
+We hope everyone is having a great week. Here's your ${teamName} update for the week of **${today}**.
+
+## Upcoming Events
+${eventLines}
+${reminderLines}
+
+As always, if you have any questions or your athlete can't make a session, please update availability in the MatMind app or reach out to a coach directly.
+
+Go Lions! 🦁
+
+*— ${teamName} Coaching Staff*`;
+
+    return {
+      text: `Here's your draft newsletter for **${groupLabel}**. Review it below, then post to the channel or send via email.`,
+      actions: [],
+      newsletterDraft: {
+        groups:  group ? [groupKey] : ['all'],
+        subject: `${teamName} — Weekly Update · ${today}`,
+        body,
+      },
     };
   }
 
@@ -396,7 +611,7 @@ export default function ChannelThread({
       if (resp.error) {
         // ── Offline fallback: use regex detection + local response ─────────
         const { applied, errors } = await executeIntents(text, { roster, events, createEvent, updateAvailabilityEntry });
-        const fallback = generateFallbackResponse(text, roster, events, availability);
+        const fallback = generateFallbackResponse(text, roster, events, availability, teamName, gymName);
         if (errors.length > 0) {
           aiMsg = {
             id: Date.now() + 1, sender: 'MatMind AI', role: 'ai', time: 'Now',
@@ -421,6 +636,11 @@ export default function ChannelThread({
             ...augmentedMsg,
             followUp: `⚠️ Some changes couldn't be saved: ${errors.join('; ')}`,
           };
+        }
+        // Attach newsletter draft to the message so the UI can render the card
+        const draftIntent = resp.intents?.find(i => i.type === 'newsletter_draft');
+        if (draftIntent) {
+          augmentedMsg = { ...augmentedMsg, newsletterDraft: draftIntent };
         }
         aiMsg = augmentedMsg;
 
@@ -534,16 +754,23 @@ export default function ChannelThread({
       {/* Messages */}
       <div ref={scrollRef} onClick={() => setSelectedMsgId(null)} style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', WebkitOverflowScrolling: 'touch' }}>
         {displayMsgs.map(m => (
-          <ChatBubble
-            key={m.id}
-            msg={m}
-            isOwn={!!currentUserId && m.senderId === currentUserId}
-            canModerate={canModerate}
-            selected={selectedMsgId === m.id}
-            onSelect={setSelectedMsgId}
-            onSaveEdit={(id, newText) => onEditMessage?.(id, channel.id, newText)}
-            onDelete={(id) => onDeleteMessage?.(id)}
-          />
+          <div key={m.id}>
+            <ChatBubble
+              msg={m}
+              isOwn={!!currentUserId && m.senderId === currentUserId}
+              canModerate={canModerate}
+              selected={selectedMsgId === m.id}
+              onSelect={setSelectedMsgId}
+              onSaveEdit={(id, newText) => onEditMessage?.(id, channel.id, newText)}
+              onDelete={(id) => onDeleteMessage?.(id)}
+            />
+            {m.newsletterDraft && (
+              <NewsletterDraftCard
+                draft={m.newsletterDraft}
+                onPostToChannel={(channelId, body) => onSendAIMessage?.(channelId, body)}
+              />
+            )}
+          </div>
         ))}
 
         {/* AI typing indicator — AI channel uses `typing`, group channels use `channelAITyping` */}
@@ -566,6 +793,7 @@ export default function ChannelThread({
             {[
               "Who's confirmed for the next tournament?",
               "Add practice Thursday at 6pm",
+              "Draft the weekly email for beginners",
               "Post our top attendance leaders to #Announcements",
             ].map((q, i) => (
               <button key={i}
