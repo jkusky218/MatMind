@@ -3,8 +3,9 @@
 // Sub-routes D03–D10 slot in here when built; stubs shown until then.
 
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import OverviewPage from './pages/OverviewPage';
-import HealthPage   from './pages/HealthPage';
+import OverviewPage  from './pages/OverviewPage';
+import HealthPage    from './pages/HealthPage';
+import TenantsPage   from './pages/TenantsPage';
 
 // ── Brand tokens (matching main app) ─────────────────────────────────────────
 const C = {
@@ -130,7 +131,7 @@ export default function AdminApp() {
         <Routes>
           <Route index element={<OverviewPage />} />
           <Route path="health"    element={<HealthPage />} />
-          <Route path="tenants"   element={<ComingSoon label="Tenant Operations" />} />
+          <Route path="tenants/*" element={<TenantsPage />} />
           <Route path="analytics" element={<ComingSoon label="Usage Analytics" />} />
           <Route path="support"   element={<ComingSoon label="Support Queue" />} />
           <Route path="dev"       element={<ComingSoon label="Development" />} />
