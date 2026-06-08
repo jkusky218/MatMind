@@ -35,7 +35,7 @@ async function apiFetch(path) {
 async function apiPost(body) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  const res = await fetch('/api/admin/support', {
+  const res = await fetch('/api/admin/index?route=support', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -99,7 +99,7 @@ function SupportQueue({ onSelect }) {
   const [filterStatus,setFilterStatus]= useState('all');
 
   useEffect(() => {
-    apiFetch('/api/admin/support')
+    apiFetch('/api/admin/index?route=support')
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -233,12 +233,12 @@ function TicketDetail({ ticketId, onBack }) {
   }
 
   async function reload() {
-    const d = await apiFetch(`/api/admin/support?id=${ticketId}`);
+    const d = await apiFetch(`/api/admin/index?route=support&id=${ticketId}`);
     setData(d);
   }
 
   useEffect(() => {
-    apiFetch(`/api/admin/support?id=${ticketId}`)
+    apiFetch(`/api/admin/index?route=support&id=${ticketId}`)
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
