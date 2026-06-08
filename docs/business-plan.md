@@ -267,3 +267,13 @@ Every new feature requires updates to help documentation, website copy, marketin
 **Group colors:** Coaches = Gold, Advanced = Navy, Beginner = Columbia Blue, Tots = Purple `#7B5EA7`
 
 **Mascot:** Lions 🦁
+
+---
+
+## Deployment
+
+**Vercel deploy hook (production · main branch):**
+```
+POST https://api.vercel.com/v1/integrations/deploy/prj_3IaIXuJhvjPeAuA9BK5x5XMOA9HD/gEUYADHPMT
+```
+Trigger a production deployment anytime: `curl -X POST <url>`
