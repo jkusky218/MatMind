@@ -6,6 +6,7 @@ import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import OverviewPage  from './pages/OverviewPage';
 import HealthPage    from './pages/HealthPage';
 import TenantsPage   from './pages/TenantsPage';
+import SupportPage   from './pages/SupportPage';
 
 // ── Brand tokens (matching main app) ─────────────────────────────────────────
 const C = {
@@ -133,7 +134,7 @@ export default function AdminApp() {
           <Route path="health"    element={<HealthPage />} />
           <Route path="tenants/*" element={<TenantsPage />} />
           <Route path="analytics" element={<ComingSoon label="Usage Analytics" />} />
-          <Route path="support"   element={<ComingSoon label="Support Queue" />} />
+          <Route path="support/*" element={<SupportPage />} />
           <Route path="dev"       element={<ComingSoon label="Development" />} />
           <Route path="marketing" element={<ComingSoon label="Marketing" />} />
           <Route path="finance"   element={<ComingSoon label="Finance" />} />
