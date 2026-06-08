@@ -8,6 +8,7 @@ import HealthPage     from './pages/HealthPage';
 import TenantsPage    from './pages/TenantsPage';
 import SupportPage    from './pages/SupportPage';
 import AnalyticsPage  from './pages/AnalyticsPage';
+import DevPage        from './pages/DevPage';
 
 // ── Brand tokens (matching main app) ─────────────────────────────────────────
 const C = {
@@ -136,7 +137,7 @@ export default function AdminApp() {
           <Route path="tenants/*" element={<TenantsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="support/*" element={<SupportPage />} />
-          <Route path="dev"       element={<ComingSoon label="Development" />} />
+          <Route path="dev"       element={<DevPage />} />
           <Route path="marketing" element={<ComingSoon label="Marketing" />} />
           <Route path="finance"   element={<ComingSoon label="Finance" />} />
         </Routes>
