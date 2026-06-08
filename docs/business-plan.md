@@ -193,7 +193,7 @@ MVP scaffold, Supabase schema, Vercel deployment, auth integration, prototype UI
 | QA agent prompt | ✅ Done | `docs/qa/cowork-qa-prompt.md` |
 | Issue templates | ✅ Done | `.github/ISSUE_TEMPLATE/bug.md` + `story.md` |
 | Sprint 001 stories (F01–F05) | ✅ Done | `docs/backlog/stories/sprint-001.md` |
-| QA scheduled at 5 AM | ⬜ Planned | QA prompt written (`docs/qa/cowork-qa-prompt.md`) but scheduled task not yet created — needs to be set up via the Cowork scheduler |
+| QA scheduled at 5 AM | ✅ Done | Active Cowork scheduled task — runs daily at 5AM. Smart skip: checks `git log main..dev` first; if no new commits, writes a one-line skip report and stops. Dual-mode: live browser testing via Chrome if available, code-review fallback if not. Target: Vercel dev preview (`mat-mind-git-dev-*.vercel.app`). Walks `docs/qa/test-checklist.md` category by category. |
 | QA → GitHub Issues pipeline | ✅ Done | QA prompt instructs agent to run `gh issue create` for each ❌, deduplicate against open issues, and commit updated report to `dev` |
 
 ### In Progress 🚧
