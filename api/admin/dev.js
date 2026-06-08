@@ -19,7 +19,7 @@ import path                    from 'path';
 async function ghFetch(endpoint) {
   const token = process.env.GITHUB_TOKEN;
   const repo  = process.env.GITHUB_REPO || 'jkusky218/MatMind';
-  if (!token) return null;
+  if (!token) return { _missing: 'GITHUB_TOKEN' };
 
   const res = await fetch(`https://api.github.com/repos/${repo}${endpoint}`, {
     headers: {
@@ -28,7 +28,11 @@ async function ghFetch(endpoint) {
       'X-GitHub-Api-Version': '2022-11-28',
     },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(`[dev] GitHub API ${endpoint} → ${res.status}:`, body.message ?? body);
+    return { _error: `GitHub ${res.status}: ${body.message ?? 'unknown'}` };
+  }
   return res.json();
 }
 
@@ -36,7 +40,7 @@ async function ghFetch(endpoint) {
 async function vercelFetch(endpoint) {
   const token     = process.env.VERCEL_TOKEN;
   const projectId = process.env.VERCEL_PROJECT_ID;
-  if (!token) return null;
+  if (!token) return { _missing: 'VERCEL_TOKEN' };
 
   const url = projectId
     ? `https://api.vercel.com${endpoint}?projectId=${projectId}&limit=10`
@@ -45,7 +49,11 @@ async function vercelFetch(endpoint) {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(`[dev] Vercel API ${endpoint} → ${res.status}:`, body.error?.message ?? body);
+    return { _error: `Vercel ${res.status}: ${body.error?.message ?? 'unknown'}` };
+  }
   return res.json();
 }
 
@@ -121,6 +129,9 @@ export default async function handler(req, res) {
 
   // ── Commits ───────────────────────────────────────────────────────────────
   const commitsData = commitsRaw.status === 'fulfilled' ? commitsRaw.value : null;
+  const githubError = commitsData?._error || commitsData?._missing
+    ? (commitsData._error ?? `Missing env var: ${commitsData._missing}`)
+    : null;
   const commits = Array.isArray(commitsData)
     ? commitsData.slice(0, 10).map(c => ({
         sha:     c.sha?.slice(0, 7),
@@ -151,6 +162,9 @@ export default async function handler(req, res) {
 
   // ── Deploys ───────────────────────────────────────────────────────────────
   const deploysData = deploysRaw.status === 'fulfilled' ? deploysRaw.value : null;
+  const vercelError = deploysData?._error || deploysData?._missing
+    ? (deploysData._error ?? `Missing env var: ${deploysData._missing}`)
+    : null;
   const deploys = Array.isArray(deploysData?.deployments)
     ? deploysData.deployments.slice(0, 10).map(d => ({
         uid:     d.uid,
@@ -183,6 +197,7 @@ export default async function handler(req, res) {
     lastDeploy,
     qa,
     flags: { hasOpenBugs, lastDeployOk, qaFailing },
+    _debug: { githubError, vercelError },
     links: {
       github:  `https://github.com/${repo}`,
       vercel:  'https://vercel.com/dashboard',
