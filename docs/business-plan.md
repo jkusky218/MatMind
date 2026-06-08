@@ -193,8 +193,9 @@ MVP scaffold, Supabase schema, Vercel deployment, auth integration, prototype UI
 | QA agent prompt | ✅ Done | `docs/qa/cowork-qa-prompt.md` |
 | Issue templates | ✅ Done | `.github/ISSUE_TEMPLATE/bug.md` + `story.md` |
 | Sprint 001 stories (F01–F05) | ✅ Done | `docs/backlog/stories/sprint-001.md` |
-| QA scheduled at 5 AM | ✅ Done | Active Cowork scheduled task — runs daily at 5AM. Smart skip: checks `git log main..dev` first; if no new commits, writes a one-line skip report and stops. Dual-mode: live browser testing via Chrome if available, code-review fallback if not. Target: Vercel dev preview (`mat-mind-git-dev-*.vercel.app`). Walks `docs/qa/test-checklist.md` category by category. |
-| QA → GitHub Issues pipeline | ✅ Done | QA prompt instructs agent to run `gh issue create` for each ❌, deduplicate against open issues, and commit updated report to `dev` |
+| QA scheduled at 5 AM | ✅ Done | Active Cowork scheduled task — runs daily at 5AM. Four-step pipeline: (1) Smart skip — checks `git log main..dev`; skips with one-line report if no new commits. (2) Dual-mode test — live browser via Claude in Chrome against Vercel dev preview, or code-review fallback (imports, schema, RLS, build, branding). (3) Files GitHub Issues via `gh issue create` for each ❌; falls back to saving issue markdown files if CLI unavailable. (4) Writes a ready-to-paste Claude Code fix prompt to `docs/qa/reports/fix-prompt-[date].md` so bugs can be resolved first thing in the morning. |
+| QA → GitHub Issues pipeline | ✅ Done | Built into Step 3 of the scheduled task — `gh issue create` per ❌ with bug template; falls back to markdown issue files if GitHub CLI is unavailable |
+| Morning fix-prompt generation | ✅ Done | Built into Step 4 of the scheduled task — auto-generates `docs/qa/reports/fix-prompt-[date].md` listing every failure with file, line, and specific fix; ready to paste into Claude Code |
 
 ### In Progress 🚧
 | Item | Status | Notes |
