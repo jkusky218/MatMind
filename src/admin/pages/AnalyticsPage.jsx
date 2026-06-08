@@ -120,7 +120,7 @@ export default function AnalyticsPage() {
   const [chartMode, setChartMode] = useState('calls'); // 'calls' | 'cost'
 
   useEffect(() => {
-    apiFetch('/api/admin/index?route=analytics')
+    apiFetch('/api/admin/?route=analytics')
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
