@@ -94,7 +94,7 @@ export default function DevPage() {
   const [error,   setError]   = useState(null);
 
   useEffect(() => {
-    apiFetch('/api/admin/index?route=dev')
+    apiFetch('/api/admin/?route=dev')
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
