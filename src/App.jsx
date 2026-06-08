@@ -4,6 +4,7 @@ import { useTeamResolver } from './hooks/useTeamResolver';
 import LoginScreen from './pages/LoginScreen';
 import MainApp from './pages/MainApp';
 import SetPasswordPage from './pages/SetPasswordPage';
+import { BrowserRouter } from 'react-router-dom';
 import AdminGuard from './admin/AdminGuard';
 
 // Admin bundle is code-split — zero admin code ships in the main entry chunk.
@@ -103,7 +104,9 @@ export default function App() {
     return (
       <AdminGuard>
         <Suspense fallback={null}>
-          <AdminApp />
+          <BrowserRouter>
+            <AdminApp />
+          </BrowserRouter>
         </Suspense>
       </AdminGuard>
     );
