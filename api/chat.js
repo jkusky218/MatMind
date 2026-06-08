@@ -9,13 +9,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName = 'My Team', gymName = 'Team Gym' } = req.body;
+  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName = 'My Team', gymName = 'Team Gym', emailTemplate } = req.body;
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
-  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName, gymName });
+  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName, gymName, emailTemplate });
 
   // Only coaches/admins get the scheduling and posting tools.
   // Parents receive Q&A responses only — no tool access.
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         ...(isCoach ? {
-          tools: [buildScheduleTool(teamName), buildPostMessageTool()],
+          tools: [buildScheduleTool(teamName), buildPostMessageTool(), buildDraftNewsletterTool()],
           tool_choice: { type: 'auto' },
         } : {}),
         system: [
@@ -87,13 +87,21 @@ export default async function handler(req, res) {
           channel: block.input?.channel || 'announcements',
           message: block.input?.message || '',
         });
+      } else if (block.type === 'tool_use' && block.name === 'draft_newsletter') {
+        intents.push({
+          type: 'newsletter_draft',
+          groups:  block.input?.groups  ?? [],
+          subject: block.input?.subject ?? '',
+          body:    block.input?.body    ?? '',
+        });
       }
     }
 
     // If Claude only returned tool calls with no text, synthesise a short reply
     if (!aiText.trim() && intents.length > 0) {
-      const eventIntents = intents.filter(i => i.type === 'create_event');
-      const postIntents  = intents.filter(i => i.type === 'post_message');
+      const eventIntents      = intents.filter(i => i.type === 'create_event');
+      const postIntents       = intents.filter(i => i.type === 'post_message');
+      const newsletterIntents = intents.filter(i => i.type === 'newsletter_draft');
 
       if (eventIntents.length > 0) {
         const allGroups = [...new Set(eventIntents.flatMap(i => i.groups ?? []))];
@@ -106,6 +114,11 @@ export default async function handler(req, res) {
         const channels = postIntents.map(i => `#${i.channel}`).join(', ');
         if (aiText) aiText += ` Posted to ${channels}.`;
         else aiText = `Done! I've posted the message to ${channels}.`;
+      }
+      if (newsletterIntents.length > 0) {
+        const n = newsletterIntents[0];
+        const groupLabel = n.groups.length ? n.groups.join(' + ') : 'all families';
+        aiText = `Here's your draft newsletter for **${groupLabel}**. Review it below, then post to the channel or send via email.`;
       }
     }
 
@@ -151,6 +164,41 @@ function buildPostMessageTool() {
         message: {
           type: 'string',
           description: 'The message text to post. Markdown supported. Include emoji for engagement.',
+        },
+      },
+    },
+  };
+}
+
+function buildDraftNewsletterTool() {
+  return {
+    name: 'draft_newsletter',
+    description:
+      'Draft a weekly team newsletter for one or more roster groups. ' +
+      'Call this once you know which group(s) the coach wants to target AND you have enough context to write the draft. ' +
+      'Do NOT call this tool if the coach has not yet specified a group — ask first. ' +
+      'Include upcoming events relevant to those groups, any important reminders the coach mentioned, ' +
+      'and extract key details from Knowledge Base entries whose title matches any upcoming event (e.g. a tournament flyer). ' +
+      'Write the body in friendly, parent-facing markdown. Use the team name and a warm tone.',
+    input_schema: {
+      type: 'object',
+      required: ['groups', 'subject', 'body'],
+      properties: {
+        groups: {
+          type: 'array',
+          items: { type: 'string', enum: ['advanced', 'beginner', 'tots', 'all'] },
+          description: 'Target roster group(s). Use ["all"] for all families.',
+        },
+        subject: {
+          type: 'string',
+          description: 'Email subject line, e.g. "Lovett Wrestling — Weekly Update · June 7"',
+        },
+        body: {
+          type: 'string',
+          description:
+            'Full email body in markdown. Structure: greeting → this week\'s events (bullet list with dates/times/locations) → ' +
+            'any tournament details extracted from KB entries → important reminders → sign-off from the coaching staff. ' +
+            'Keep it friendly and skimmable. Bold key dates and names.',
         },
       },
     },
@@ -234,7 +282,7 @@ function buildAttendanceSummary(attendance = {}, roster = []) {
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
-function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, knowledgeBase = [], userRole = 'coach', userName = 'Coach', teamName = 'My Team', gymName = 'Team Gym' }) {
+function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, knowledgeBase = [], channels = [], userRole = 'coach', userName = 'Coach', teamName = 'My Team', gymName = 'Team Gym', emailTemplate = null }) {
   const athletes = roster.filter(r => r.group !== 'coaches');
   const coaches  = roster.filter(r => r.group === 'coaches');
 
@@ -285,7 +333,16 @@ ${userRole === 'coach'
 - After calling the tool, confirm briefly in your text response what you scheduled.
 - To post a message to a channel, use the post_to_channel tool. When the coach asks to post, announce, or share something, call it immediately.
 - For attendance leaderboards: read the ATTENDANCE RECORDS below, rank athletes by present count, compose an engaging message, then call post_to_channel.
-- Be proactive — mention upcoming events, availability gaps, and things the coach should know.`
+- Be proactive — mention upcoming events, availability gaps, and things the coach should know.
+- NEWSLETTER DRAFTING: When a coach asks to draft, write, or send a weekly email/newsletter/update:
+  1. If they have NOT specified which group(s) to target, ask "Which group(s)? Beginners, Advanced, Tots, or all families?" before drafting.
+  2. Once you know the group(s), call the draft_newsletter tool with a complete draft.
+  3. Scan the KNOWLEDGE BASE for any entry whose title closely matches an upcoming event name — extract venue, check-in time, weigh-in info, registration notes, and include them in the newsletter body.
+  4. Fold in any specific reminders or notes the coach mentioned in their message (e.g. "remind them about shoes", "stress attendance").
+  5. Write in a warm, parent-facing tone — coaches are signing off, not writing to peers.${emailTemplate ? `
+  6. IMPORTANT — Follow the team's saved email template exactly. Structure the newsletter using these sections in order:
+${emailTemplate.sections.map((s, i) => `     ${i + 1}. ${s.title}${s.is_required ? ' [REQUIRED]' : ' [optional]'}${s.auto_populate ? ' [auto-populate from schedule data]' : ''}${s.guidance ? `\n        Guidance: ${s.guidance}` : ''}`).join('\n')}
+     Tone: ${emailTemplate.tone}. Do not add sections not listed above unless the coach specifically requests it.` : ''}`
   : `You are MatMind, replying inside a team chat channel that parents and coaches share.
 - Answer the question directly, then STOP. Keep it to 1–3 short sentences.
 - Do NOT end with "Is there anything else I can help with?", "Let me know if…", or any

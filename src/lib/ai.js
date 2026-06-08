@@ -29,10 +29,11 @@ export async function sendToMatMind(message, context = {}, history = []) {
         attendance:    context.attendance   || {},
         knowledgeBase: context.kbEntries    || [],
         channels:      context.channels     || [],
-        userRole:      context.userRole     || 'coach',
-        userName:      context.userName     || 'Coach',
-        teamName:      context.teamName     || 'My Team',
-        gymName:       context.gymName      || 'Team Gym',
+        userRole:      context.userRole      || 'coach',
+        userName:      context.userName      || 'Coach',
+        teamName:      context.teamName      || 'My Team',
+        gymName:       context.gymName       || 'Team Gym',
+        emailTemplate: context.emailTemplate || null,
       }),
     });
 

@@ -2,7 +2,8 @@
 
 > Paste into a Cowork (Claude) session with browser access (Claude-in-Chrome or a
 > Playwright/Puppeteer setup). The agent drives the **deployed** app, runs the QA
-> checklist, and writes a dated report to `docs/qa/reports/`.
+> checklist, writes a dated report to `docs/qa/reports/`, and **automatically opens
+> a GitHub Issue for every failure found.**
 
 ---
 
@@ -43,6 +44,10 @@ buttons, so you click buttons.
    re-submits, casual vs. question messages for the AI, cross-device sync.
 4. **Don't stop at the first failure** — complete the category, then continue.
 5. **Write the report** to `docs/qa/reports/YYYY-MM-DD-<sha>.md` (template below).
+6. **Open a GitHub Issue for every ❌** (see instructions below) — do this AFTER
+   writing the report so the issue body can reference the report file path.
+7. **Commit the report** to the `dev` branch with message:
+   `QA report YYYY-MM-DD: N pass, N fail, N warn`
 
 ## Report template
 
@@ -74,6 +79,75 @@ isn't a hard failure.
 
 ## Cleanup
 Test artifacts removed / left behind (with reason).
+
+## GitHub Issues opened
+| Checklist ID | Issue # | Title |
+|---|---|---|
+| <ID> | #<N> | <title> |
+```
+
+## Filing GitHub Issues automatically
+
+After completing the report, run the following for **each ❌ failure** using the
+`gh` CLI. The issue is created in the `jkusky218/MatMind` repo.
+
+### Severity mapping
+| Failure type | Label | Priority |
+|---|---|---|
+| Auth, RLS, data leak | `bug`, `severity:critical` | P0 |
+| App crash, broken core flow | `bug`, `severity:high` | P1 |
+| Feature wrong/incomplete | `bug`, `severity:medium` | P2 |
+| Polish, UX friction | `bug`, `severity:low` | P3 |
+
+### Command to run for each failure
+
+```bash
+gh issue create \
+  --repo jkusky218/MatMind \
+  --title "[BUG] <CHECKLIST-ID> — <one-line description>" \
+  --label "bug" \
+  --label "severity:<critical|high|medium|low>" \
+  --body "$(cat <<'EOF'
+## Bug report
+
+**Checklist ID:** <e.g. AUTH-03>
+**QA report:** docs/qa/reports/<YYYY-MM-DD-sha>.md
+**Environment:** test.mat-mind.com
+**Build:** <sha>
+**Date found:** <YYYY-MM-DD>
+
+## Steps to reproduce
+1. …
+2. …
+3. …
+
+## Expected behaviour
+…
+
+## Actual behaviour
+…
+
+## Suspected area
+<file / hook / API endpoint>
+
+## Severity
+<Critical / High / Medium / Low> — <one sentence rationale>
+
+---
+*Filed automatically by the MatMind 5AM QA agent.*
+EOF
+)"
+```
+
+### After all issues are created
+
+Add the issue numbers to the **GitHub Issues opened** table in the report, then
+commit the updated report:
+
+```bash
+git add docs/qa/reports/<report-file>.md
+git commit -m "QA report <date>: <N> pass, <N> fail, <N> warn — <N> issues opened"
+git push origin dev
 ```
 
 ## Rules
@@ -82,8 +156,12 @@ Test artifacts removed / left behind (with reason).
    response.
 2. **Verdicts are runtime-only.** "The code looks right" is not a pass.
 3. **One report per run**, committed to `docs/qa/reports/`.
-4. **File a bug** for each ❌ using `.github/ISSUE_TEMPLATE/bug.md`, referencing the
-   checklist ID.
+4. **One GitHub Issue per ❌**, using the `gh issue create` command above.
+   - Check for an existing open issue with the same checklist ID before creating
+     (`gh issue list --repo jkusky218/MatMind --label bug --search "<ID>"`) —
+     don't duplicate if already open.
+   - If the issue already exists and the bug is still reproducible, add a comment
+     instead: `gh issue comment <N> --body "Still failing — <date> QA run."`
 5. **When in doubt, fail** and attach the raw capture — don't interpret ambiguous
    output as a pass.
 6. Keep tenant isolation sacred: if you ever see another team's data, that's a

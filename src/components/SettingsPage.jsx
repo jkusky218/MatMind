@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { BRAND, GROUPS, GROUP_LABELS, GROUP_COLORS } from '../lib/constants';
 import { ChevLeft, Shield, Plus, Trash } from './Icons';
 import { uploadTeamLogo } from '../lib/storage';
+import EmailTemplateManager from './EmailTemplateManager';
 
 // ── Shared UI primitives ──────────────────────────────────────────────────────
 
@@ -784,7 +785,8 @@ function AiChannelModeRow({ mode = 'smart', onSave }) {
 
 // ── Main SettingsPage ─────────────────────────────────────────────────────────
 
-export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings, onClose, push }) {
+export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings, onClose, push, showTemplates = false }) {
+  const [templatesOpen, setTemplatesOpen] = useState(showTemplates);
   const teamName       = teamSettings.teamName    || 'My Team';
   const primaryColor   = teamSettings.primaryColor   || '#1B3A5C';
   const secondaryColor = teamSettings.secondaryColor || '#6BADE4';
@@ -798,9 +800,10 @@ export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings
       .map(g => ({ slug: g.id, label: g.label, icon: '#️⃣' })),
   ];
 
-  const profile = auth.profile;
-  const isAdmin = profile?.role === 'admin';
-  const teamId  = profile?.team_id;
+  const profile  = auth.profile;
+  const isAdmin  = auth.isSuperAdmin || profile?.role === 'admin';
+  const isCoach  = isAdmin || profile?.role === 'coach' || !profile;
+  const teamId   = profile?.team_id;
   const initials = (profile?.full_name ?? 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   return (
@@ -944,6 +947,29 @@ export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings
           </>
         )}
 
+        {/* ── COACH SECTIONS ── */}
+        {isCoach && (
+          <>
+            <SectionLabel>Email Templates</SectionLabel>
+            <Card>
+              <button onClick={() => setTemplatesOpen(true)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                padding: '13px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+              }}>
+                <span style={{ fontSize: 20 }}>📧</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: '#1a1a1a' }}>Manage Email Templates</p>
+                  <p style={{ margin: 0, fontSize: 12, color: '#8a96a3' }}>Paste & learn or build from sections</p>
+                </div>
+                <span style={{ color: '#bbb', fontSize: 18 }}>›</span>
+              </button>
+            </Card>
+            <p style={{ fontSize: 11, color: '#b0b8c2', margin: '6px 4px 0', lineHeight: 1.4 }}>
+              Saved templates guide the AI when you ask it to draft your weekly newsletter.
+            </p>
+          </>
+        )}
+
         {/* ── ADMIN SECTIONS ── */}
         {isAdmin && (
           <>
@@ -1025,6 +1051,13 @@ export default function SettingsPage({ auth, teamSettings = {}, onUpdateSettings
           MatMind · {teamName}{isAdmin ? ' · Admin' : ''}
         </p>
       </div>
+
+      {/* Email Template Manager overlay */}
+      {templatesOpen && (
+        <div style={{ position: 'absolute', inset: 0, background: '#f8fafb', zIndex: 50, display: 'flex', flexDirection: 'column' }}>
+          <EmailTemplateManager auth={auth} onBack={() => setTemplatesOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }
