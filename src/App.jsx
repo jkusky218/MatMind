@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useTeamResolver } from './hooks/useTeamResolver';
 import LoginScreen from './pages/LoginScreen';
 import MainApp from './pages/MainApp';
 import SetPasswordPage from './pages/SetPasswordPage';
+import { BrowserRouter } from 'react-router-dom';
+import AdminGuard from './admin/AdminGuard';
+
+// Admin bundle is code-split — zero admin code ships in the main entry chunk.
+const AdminApp = lazy(() => import('./admin/AdminApp'));
 
 // Read the URL hash ONCE at module load — Supabase clears it after processing,
 // so we capture it here before any effects run.
@@ -89,6 +94,21 @@ export default function App() {
         onComplete={() => setNeedsSetPassword(false)}
         teamBranding={teamBranding}
       />
+    );
+  }
+
+  // ── CEO Operations Dashboard ─────────────────────────────────────────────────
+  // /admin is only reachable by super_admins. AdminGuard enforces this client-side;
+  // every api/admin/* function enforces it server-side via requireSuperAdmin().
+  if (window.location.pathname.startsWith('/admin')) {
+    return (
+      <AdminGuard>
+        <Suspense fallback={null}>
+          <BrowserRouter>
+            <AdminApp />
+          </BrowserRouter>
+        </Suspense>
+      </AdminGuard>
     );
   }
 

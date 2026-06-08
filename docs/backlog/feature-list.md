@@ -172,6 +172,80 @@ view schedule/roster.
 
 ---
 
+## CEO Operations Dashboard
+
+Internal operator dashboard at `/admin`. Super-admin only. Code-split from the main app.
+Full spec: [`docs/ceo-dashboard-features.md`](../ceo-dashboard-features.md)
+
+### D01 · Admin Auth & Route Guard  ⬜ P0
+**As a** MatMind operator **I want** a protected `/admin` route **so that** only super admins can access the dashboard.
+- `super_admin` role on `profiles`; JWT custom claim; server-side verification on all `api/admin/*` functions.
+- Client route guard redirects non-super-admins to `/`.
+- **Acceptance:** non-super-admin JWT cannot access `/admin` or any `api/admin/*` endpoint.
+- **Deps:** F01 (auth), Supabase `profiles` table.
+
+### D02 · Dashboard Shell & Overview Page  ⬜ P0
+**As a** MatMind operator **I want** a sidebar-nav shell with an overview page **so that** I can navigate all dashboard sections.
+- Lazy-loaded `src/admin/` bundle. Sidebar: Health, Tenants, Analytics, Support, Dev, Marketing, Finance.
+- Overview page: summary cards (one per section) with key metric + link to full section.
+- **Acceptance:** shell renders at `/admin`; sidebar navigation works; zero admin code in main bundle (`npm run build` chunk analysis).
+- **Deps:** D01.
+
+### D03 · System Health  ⬜ P1
+**As a** MatMind operator **I want** to see API uptime and latency **so that** I know the platform is healthy.
+- `GET /api/admin/health` endpoint; `system_health_log` table written by Vercel cron every 5 min.
+- Dashboard view: uptime %, p50/p95 latency, error rate, last 24 h sparkline.
+- **Acceptance:** cron inserts rows; dashboard reads them; `status = 'down'` turns card red.
+- **Deps:** D01, D02.
+
+### D04 · Tenant Operations  ⬜ P1
+**As a** MatMind operator **I want** to see all teams and their engagement **so that** I can spot at-risk tenants.
+- Tenant list with counts (athletes, parents, events last 30 days, last login).
+- At-risk flag: zero logins in 14+ days. Detail view per team. Read-only impersonation link.
+- **Acceptance:** all teams listed; at-risk teams flagged; detail view shows live counts from Supabase.
+- **Deps:** D01, D02.
+
+### D05 · Support View  ⬜ P1
+**As a** MatMind operator **I want** to see and respond to open support tickets **so that** T3 escalations don't go unanswered.
+- Ticket queue sorted by age; filter by tier/status. Thread view with reply + close + promote-to-KB actions.
+- Metrics: open count by tier, AI resolution rate, median response time.
+- **Acceptance:** operator can reply to T3 ticket from `/admin/support`; reply appears in user's support thread; ticket closeable.
+- **Deps:** D01, D02, F16 (support tables).
+
+### D06 · Usage Analytics  ⬜ P2
+**As a** MatMind operator **I want** to see DAU/MAU, feature usage, and AI token costs **so that** I understand product health and cost.
+- `ai_call_log` and `feature_events` tables. 30-day sparklines, feature breakdown bar chart.
+- Token cost computed client-side: `(input * $1 + output * $5) / 1M`.
+- **Acceptance:** AI call count matches manual count in Anthropic console (±5%); cost estimate visible.
+- **Deps:** D01, D02, D04.
+
+### D07 · Development View  ⬜ P2
+**As a** MatMind operator **I want** to see sprint status, open bugs, and deploy history **so that** I know what's in flight.
+- GitHub API: last 5 commits on `main`, open `bug`-labeled issues. Vercel API: last 10 deployments.
+- Latest QA report displayed inline (reads `docs/qa/reports/` via GitHub API).
+- **Acceptance:** commits and deploys display correctly; QA result shows last run date and pass/fail.
+- **Deps:** D01, D02, `GITHUB_TOKEN`, `VERCEL_TOKEN`.
+
+### D08 · Marketing View  ⬜ P3
+**As a** MatMind operator **I want** to see funnel metrics and CPA by channel **so that** I know what's driving growth.
+- Manual input (week, channel, leads, spend) before Facebook API; upgrades to live data post-integration.
+- **Acceptance:** operator can log weekly marketing snapshot; CPA computed and displayed.
+- **Deps:** D01, D02, `docs/facebook-funnel-automation.md` Phase 2.
+
+### D09 · Finance View  ⬜ P3
+**As a** MatMind operator **I want** to see MRR, LTV, and CAC **so that** I understand unit economics.
+- Stripe integration: subscriptions, events, churn. Computed metrics: LTV, CAC, payback period.
+- **Acceptance:** MRR matches Stripe dashboard; churn rate accurate.
+- **Deps:** D01, D02, Stripe account + `STRIPE_SECRET_KEY`.
+
+### D10 · Quick Actions  ⬜ P3
+**As a** MatMind operator **I want** one-click actions (create tenant, trigger QA, force redeploy) **so that** I don't have to leave the dashboard for common ops tasks.
+- All actions require confirmation dialog. All logged to `admin_audit_log`.
+- **Acceptance:** create tenant action inserts team row and sends welcome email; QA trigger fires Cowork webhook.
+- **Deps:** D01–D07.
+
+---
+
 ## Backlog discipline
 
 - Every feature ships behind a **story** (`docs/backlog/stories/`) with acceptance
