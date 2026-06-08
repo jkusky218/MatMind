@@ -9,13 +9,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName = 'My Team', gymName = 'Team Gym' } = req.body;
+  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName = 'My Team', gymName = 'Team Gym', emailTemplate } = req.body;
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
-  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName, gymName });
+  const systemPrompt = buildSystemPrompt({ roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName, gymName, emailTemplate });
 
   // Only coaches/admins get the scheduling and posting tools.
   // Parents receive Q&A responses only — no tool access.
@@ -282,7 +282,7 @@ function buildAttendanceSummary(attendance = {}, roster = []) {
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
-function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, knowledgeBase = [], userRole = 'coach', userName = 'Coach', teamName = 'My Team', gymName = 'Team Gym' }) {
+function buildSystemPrompt({ roster = [], events = [], availability = {}, attendance = {}, knowledgeBase = [], channels = [], userRole = 'coach', userName = 'Coach', teamName = 'My Team', gymName = 'Team Gym', emailTemplate = null }) {
   const athletes = roster.filter(r => r.group !== 'coaches');
   const coaches  = roster.filter(r => r.group === 'coaches');
 
@@ -339,7 +339,10 @@ ${userRole === 'coach'
   2. Once you know the group(s), call the draft_newsletter tool with a complete draft.
   3. Scan the KNOWLEDGE BASE for any entry whose title closely matches an upcoming event name — extract venue, check-in time, weigh-in info, registration notes, and include them in the newsletter body.
   4. Fold in any specific reminders or notes the coach mentioned in their message (e.g. "remind them about shoes", "stress attendance").
-  5. Write in a warm, parent-facing tone — coaches are signing off, not writing to peers.`
+  5. Write in a warm, parent-facing tone — coaches are signing off, not writing to peers.${emailTemplate ? `
+  6. IMPORTANT — Follow the team's saved email template exactly. Structure the newsletter using these sections in order:
+${emailTemplate.sections.map((s, i) => `     ${i + 1}. ${s.title}${s.is_required ? ' [REQUIRED]' : ' [optional]'}${s.auto_populate ? ' [auto-populate from schedule data]' : ''}${s.guidance ? `\n        Guidance: ${s.guidance}` : ''}`).join('\n')}
+     Tone: ${emailTemplate.tone}. Do not add sections not listed above unless the coach specifically requests it.` : ''}`
   : `You are MatMind, replying inside a team chat channel that parents and coaches share.
 - Answer the question directly, then STOP. Keep it to 1–3 short sentences.
 - Do NOT end with "Is there anything else I can help with?", "Let me know if…", or any

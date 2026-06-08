@@ -15,6 +15,7 @@ import KnowledgeBaseTab  from '../components/KnowledgeBaseTab';
 import { useKnowledgeBase } from '../hooks/useKnowledgeBase';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import NotificationBanner from '../components/NotificationBanner';
+import { useEmailTemplates } from '../hooks/useEmailTemplates';
 
 
 const TABS = [
@@ -74,6 +75,9 @@ export default function MainApp({ auth }) {
   // Pull-to-refresh: re-fetches team data in place (no full page reload).
   // containerRef is a callback ref so listeners attach when the content mounts.
   const { containerRef, pull, progress, refreshing, threshold } = usePullToRefresh(refresh);
+
+  // Email templates — default template guides AI newsletter drafts
+  const { defaultTemplate } = useEmailTemplates(auth);
 
   function handleMemberAdded({ type, data }) {
     if (type === 'coach' && data) {
@@ -263,6 +267,7 @@ export default function MainApp({ auth }) {
             teamSettings={teamSettings}
             teamId={auth.profile?.team_id}
             push={push}
+            emailTemplate={defaultTemplate}
           />
         ) : (
           <>

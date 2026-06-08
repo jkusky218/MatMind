@@ -44,10 +44,11 @@ function InlineBold({ text }) {
 // ── Newsletter draft card ──────────────────────────────────────────────────────
 const GROUP_CHANNEL_MAP = { beginner: 'beginner', advanced: 'advanced', tots: 'tots', all: 'announcements' };
 
-function NewsletterDraftCard({ draft, onPostToChannel }) {
-  const [posted,  setPosted]  = useState(false);
-  const [copying, setCopying] = useState(false);
-  const [toast,   setToast]   = useState(null);
+function NewsletterDraftCard({ draft, onPostToChannel, teamId, sentBy }) {
+  const [posted,   setPosted]   = useState(false);
+  const [copying,  setCopying]  = useState(false);
+  const [sending,  setSending]  = useState(false);
+  const [toast,    setToast]    = useState(null);
 
   const groupLabels = draft.groups?.length
     ? draft.groups.map(g => g === 'all' ? 'All Families' : GROUP_LABELS[g] ?? g).join(' + ')
@@ -78,9 +79,38 @@ function NewsletterDraftCard({ draft, onPostToChannel }) {
     }
   };
 
-  const handleEmail = () => {
-    setToast('Email sending coming soon — add SENDGRID_API_KEY to enable.');
-    setTimeout(() => setToast(null), 4000);
+  const handleEmail = async () => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject:    draft.subject,
+          body:       draft.body,
+          groups:     draft.groups?.length ? draft.groups : ['all'],
+          teamId,
+          templateId: draft.templateId ?? null,
+          sentBy,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 503) {
+          setToast('📧 Email not configured — add SENDGRID_API_KEY to Vercel to enable sending.');
+        } else {
+          setToast(`Send failed: ${data.error}`);
+        }
+      } else {
+        setToast(`✅ Sent to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}!`);
+      }
+    } catch {
+      setToast('Send failed — check your connection.');
+    } finally {
+      setSending(false);
+      setTimeout(() => setToast(null), 5000);
+    }
   };
 
   return (
@@ -139,12 +169,14 @@ function NewsletterDraftCard({ draft, onPostToChannel }) {
           </button>
           <button
             onClick={handleEmail}
+            disabled={sending}
             style={{
-              flex: 2, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              flex: 2, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              cursor: sending ? 'default' : 'pointer', opacity: sending ? 0.7 : 1,
               background: '#fff', border: `1px solid ${BRAND.columbia}60`, color: BRAND.navy,
             }}
           >
-            📧 Send Email
+            {sending ? '⏳ Sending…' : '📧 Send Email'}
           </button>
         </div>
       </div>
@@ -527,6 +559,7 @@ export default function ChannelThread({
   teamSettings = {},
   teamId,
   push,
+  emailTemplate = null,
 }) {
   const teamName = teamSettings.teamName || 'Team';
   const gymName  = teamSettings.gymName  || 'Team Gym';
@@ -603,7 +636,7 @@ export default function ChannelThread({
       // ── 1. Get Claude's response (it includes structured intents when needed) ──
       const resp = await sendToMatMind(
         text,
-        { roster, events, availability, attendance: attendance ?? {}, kbEntries: kbEntries ?? [], userRole: userRole ?? 'coach', userName: senderName ?? 'Coach', teamName, gymName },
+        { roster, events, availability, attendance: attendance ?? {}, kbEntries: kbEntries ?? [], userRole: userRole ?? 'coach', userName: senderName ?? 'Coach', teamName, gymName, emailTemplate },
         history,
       );
 
@@ -768,6 +801,8 @@ export default function ChannelThread({
               <NewsletterDraftCard
                 draft={m.newsletterDraft}
                 onPostToChannel={(channelId, body) => onSendAIMessage?.(channelId, body)}
+                teamId={teamId}
+                sentBy={currentUserId}
               />
             )}
           </div>
