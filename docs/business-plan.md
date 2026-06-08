@@ -179,6 +179,49 @@ MVP scaffold, Supabase schema, Vercel deployment, auth integration, prototype UI
 
 ---
 
+## Marketing Automation
+
+MatMind's growth will be driven by automated marketing funnels built on top of the same Claude + API stack powering the product. The goal is to reduce manual Ads Manager work to near zero — Claude generates campaign structure and copy, the Facebook Marketing API deploys it, and a performance loop feeds metrics back into Claude for continuous optimization.
+
+**Full plan:** [`docs/facebook-funnel-automation.md`](./facebook-funnel-automation.md)
+
+### Summary
+- **Platform:** Facebook first (Instagram included via same Meta API), TikTok in a later phase
+- **Stack:** Claude Haiku 4.5 (generation) + Claude Sonnet 4.6 (strategy) + Facebook Marketing API + Anthropic API
+- **Funnel:** Three-stage TOFU → MOFU → BOFU with hyper-narrow cold audiences (50K–200K, not broad)
+- **Automation:** Campaign creation, copy variants, performance polling, and optimization recommendations — all automated
+- **Prerequisite:** LLC formation required before Meta Business Portfolio and app review can proceed
+
+### Phase Alignment
+| Marketing Phase | Dependency |
+|----------------|-----------|
+| Phase 1 — API access + manual test | LLC formed |
+| Phase 2 — Claude generates + deploys campaigns | Anthropic API key; Meta app approved |
+| Phase 3 — Performance loop (auto-optimize) | Pixel installed; 2+ weeks of spend data |
+| Phase 4 — Instagram + TikTok expansion | Phase 2 proven; TikTok business account |
+
+---
+
+## Content Operations
+
+Every new feature requires updates to help documentation, website copy, marketing ads, and onboarding emails. A weekly automated content-audit agent keeps these assets in sync — no manual tracking required.
+
+**How it works:**
+1. [`docs/content-registry.md`](./content-registry.md) maps every feature (F01–F16+) to the downstream assets it affects
+2. A Cowork scheduled agent runs every Monday at 6 AM, checks `git log` for features merged since the last run, identifies stale or missing assets, and drafts updates
+3. Drafts are saved to `docs/content-audit/drafts/` and a GitHub Issue is opened per asset for review and merge
+
+**Agent prompt:** [`docs/content-audit/cowork-content-audit-prompt.md`](./content-audit/cowork-content-audit-prompt.md)
+
+**Covered asset types:**
+- Help documentation (per feature, audience-specific)
+- Website — features page, homepage, pricing, onboarding copy
+- Facebook ads — cold (TOFU) and retargeting (MOFU/BOFU) variants
+- Onboarding emails — coach welcome + parent invite
+- Business plan (flagged for human review, not auto-edited)
+
+---
+
 ## SDLC Infrastructure
 
 ### Completed ✅
