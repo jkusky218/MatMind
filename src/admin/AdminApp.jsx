@@ -132,14 +132,14 @@ export default function AdminApp() {
 
       <main style={{ flex: 1, overflowY: 'auto', minHeight: '100vh' }}>
         <Routes>
-          <Route index element={<OverviewPage />} />
-          <Route path="health"    element={<HealthPage />} />
-          <Route path="tenants/*" element={<TenantsPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="support/*" element={<SupportPage />} />
-          <Route path="dev"       element={<DevPage />} />
-          <Route path="marketing" element={<ComingSoon label="Marketing" />} />
-          <Route path="finance"   element={<ComingSoon label="Finance" />} />
+          <Route path="/admin"            element={<OverviewPage />} />
+          <Route path="/admin/health"     element={<HealthPage />} />
+          <Route path="/admin/tenants/*"  element={<TenantsPage />} />
+          <Route path="/admin/analytics"  element={<AnalyticsPage />} />
+          <Route path="/admin/support/*"  element={<SupportPage />} />
+          <Route path="/admin/dev"        element={<DevPage />} />
+          <Route path="/admin/marketing"  element={<ComingSoon label="Marketing" />} />
+          <Route path="/admin/finance"    element={<ComingSoon label="Finance" />} />
         </Routes>
       </main>
     </div>
