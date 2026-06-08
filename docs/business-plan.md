@@ -193,8 +193,8 @@ MVP scaffold, Supabase schema, Vercel deployment, auth integration, prototype UI
 | QA agent prompt | ✅ Done | `docs/qa/cowork-qa-prompt.md` |
 | Issue templates | ✅ Done | `.github/ISSUE_TEMPLATE/bug.md` + `story.md` |
 | Sprint 001 stories (F01–F05) | ✅ Done | `docs/backlog/stories/sprint-001.md` |
-| QA scheduled at 5 AM | ✅ Done | Automated QA run scheduled daily |
-| QA → GitHub Issues pipeline | ✅ Done | QA agent runs `gh issue create` for each ❌; deduplicates against open issues; commits updated report to `dev` |
+| QA scheduled at 5 AM | ⬜ Planned | QA prompt written (`docs/qa/cowork-qa-prompt.md`) but scheduled task not yet created — needs to be set up via the Cowork scheduler |
+| QA → GitHub Issues pipeline | ✅ Done | QA prompt instructs agent to run `gh issue create` for each ❌, deduplicate against open issues, and commit updated report to `dev` |
 
 ### In Progress 🚧
 | Item | Status | Notes |
