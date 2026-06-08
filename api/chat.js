@@ -1,6 +1,32 @@
 // MatMind AI Chat — Vercel Serverless Function
 // Calls Claude Haiku 4.5 with team context via prompt caching + tool use
 
+import { createClient } from '@supabase/supabase-js';
+
+function getServiceClient() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+// Fire-and-forget: log AI call to ai_call_log for analytics. Never blocks the response.
+async function logAICall({ teamId, userId, usage, toolCalls, latencyMs }) {
+  try {
+    const supabase = getServiceClient();
+    if (!supabase) return;
+    await supabase.from('ai_call_log').insert({
+      team_id:           teamId   || null,
+      user_id:           userId   || null,
+      input_tokens:      usage?.input_tokens       ?? 0,
+      output_tokens:     usage?.output_tokens      ?? 0,
+      cache_read_tokens: usage?.cache_read_input_tokens ?? 0,
+      tool_calls:        toolCalls?.length ? toolCalls : null,
+      latency_ms:        latencyMs ?? null,
+    });
+  } catch (_) { /* best-effort — never fail the chat response */ }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -9,7 +35,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName = 'My Team', gymName = 'Team Gym', emailTemplate } = req.body;
+  const { message, history = [], roster, events, availability, attendance, knowledgeBase, channels, userRole, userName, teamName = 'My Team', gymName = 'Team Gym', emailTemplate,
+    teamId, userId } = req.body;
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -21,6 +48,7 @@ export default async function handler(req, res) {
   // Parents receive Q&A responses only — no tool access.
   const isCoach = userRole === 'coach' || userRole === 'admin';
 
+  const callStart = Date.now();
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -124,15 +152,24 @@ export default async function handler(req, res) {
 
     const { text, actions, followUp } = parseAIResponse(aiText);
 
+    // Log to ai_call_log for CEO dashboard analytics (fire-and-forget)
+    logAICall({
+      teamId,
+      userId,
+      usage:      data.usage,
+      toolCalls:  intents.map(i => i.type),
+      latencyMs:  callStart ? Date.now() - callStart : null,
+    });
+
     return res.status(200).json({
       text,
       actions,
       followUp,
       intents,
       usage: {
-        input_tokens:  data.usage?.input_tokens,
-        output_tokens: data.usage?.output_tokens,
-        cache_read:    data.usage?.cache_read_input_tokens,
+        input_tokens:   data.usage?.input_tokens,
+        output_tokens:  data.usage?.output_tokens,
+        cache_read:     data.usage?.cache_read_input_tokens,
         cache_creation: data.usage?.cache_creation_input_tokens,
       },
     });
