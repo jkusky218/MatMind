@@ -194,6 +194,7 @@ MVP scaffold, Supabase schema, Vercel deployment, auth integration, prototype UI
 | Issue templates | ✅ Done | `.github/ISSUE_TEMPLATE/bug.md` + `story.md` |
 | Sprint 001 stories (F01–F05) | ✅ Done | `docs/backlog/stories/sprint-001.md` |
 | QA scheduled at 5 AM | ✅ Done | Automated QA run scheduled daily |
+| QA → GitHub Issues pipeline | ✅ Done | QA agent runs `gh issue create` for each ❌; deduplicates against open issues; commits updated report to `dev` |
 
 ### In Progress 🚧
 | Item | Status | Notes |
