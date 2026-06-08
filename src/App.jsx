@@ -17,6 +17,21 @@ const _params = new URLSearchParams(_hash.startsWith('#') ? _hash.slice(1) : _ha
 const _authType = _params.get('type'); // 'invite' | 'recovery' | null
 
 export default function App() {
+  // ── CEO Operations Dashboard — check FIRST before any auth/team resolution ──
+  // Must be top-level so the admin route works on any subdomain (including
+  // lovett.mat-mind.com/admin) without the team resolver interfering.
+  if (window.location.pathname.startsWith('/admin')) {
+    return (
+      <AdminGuard>
+        <Suspense fallback={null}>
+          <BrowserRouter>
+            <AdminApp />
+          </BrowserRouter>
+        </Suspense>
+      </AdminGuard>
+    );
+  }
+
   const auth = useAuth();
   const { teamBranding, loading: brandingLoading, notFound } = useTeamResolver();
   const [updateReady, setUpdateReady] = useState(false);
@@ -94,21 +109,6 @@ export default function App() {
         onComplete={() => setNeedsSetPassword(false)}
         teamBranding={teamBranding}
       />
-    );
-  }
-
-  // ── CEO Operations Dashboard ─────────────────────────────────────────────────
-  // /admin is only reachable by super_admins. AdminGuard enforces this client-side;
-  // every api/admin/* function enforces it server-side via requireSuperAdmin().
-  if (window.location.pathname.startsWith('/admin')) {
-    return (
-      <AdminGuard>
-        <Suspense fallback={null}>
-          <BrowserRouter>
-            <AdminApp />
-          </BrowserRouter>
-        </Suspense>
-      </AdminGuard>
     );
   }
 
