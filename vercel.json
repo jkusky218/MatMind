@@ -7,7 +7,7 @@
   ],
   "crons": [
     {
-      "path": "/api/admin/health",
+      "path": "/api/ops?route=health",
       "schedule": "0 8 * * *"
     }
   ]

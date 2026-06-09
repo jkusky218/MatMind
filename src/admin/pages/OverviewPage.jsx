@@ -1,5 +1,5 @@
 // OverviewPage.jsx — CEO Dashboard overview / mission control
-// Shows one SummaryCard per section. Live data from /api/admin/?route=overview.
+// Shows one SummaryCard per section. Live data from /api/ops?route=overview.
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -20,7 +20,7 @@ export default function OverviewPage() {
         const token = session?.access_token;
         if (!token) throw new Error('No session — please log in again.');
 
-        const res = await fetch('/api/admin/?route=overview', {
+        const res = await fetch('/api/ops?route=overview', {
           headers: { Authorization: `Bearer ${token}` },
         });
 

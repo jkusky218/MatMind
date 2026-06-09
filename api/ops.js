@@ -11,7 +11,7 @@
 //   dev        → GET commits, issues, deploys, QA report
 
 import { createClient } from '@supabase/supabase-js';
-import { requireSuperAdmin } from '../../src/lib/adminAuth.js';
+import { requireSuperAdmin } from '../src/lib/adminAuth.js';
 
 function getServiceClient() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -175,7 +175,7 @@ async function handleSupport(req, res, supabase, admin) {
     supabase.from('support_tickets').select('*, profiles(full_name,email), teams(name,slug)').in('status',['open','in_progress','escalated']).order('created_at',{ascending:true}),
     supabase.from('support_tickets').select('status,created_at').gte('created_at',ago7d),
   ]);
-  const tickets = (tRes.status==='fulfilled'?tRes.value.data??[]).map(t=>({...t,tier:inferTier(t)}));
+  const tickets = (tRes.status==='fulfilled' ? (tRes.value.data ?? []) : []).map(t=>({...t,tier:inferTier(t)}));
   const recent  = rRes.status==='fulfilled' ? (rRes.value.data??[]) : [];
   const byTier  = {T1:0,T2:0,T3:0};
   for(const t of tickets) byTier[t.tier]=(byTier[t.tier]??0)+1;
@@ -254,16 +254,21 @@ export default async function handler(req, res) {
 
   const route = req.query?.route;
 
+  let supabase;
+  try {
+    supabase = getServiceClient();
+  } catch (err) {
+    console.error('[ops] service client init failed:', err.message);
+    return res.status(500).json({ error: `Server config error: ${err.message}` });
+  }
+
   // Health endpoint is public (for uptime monitors) when no auth header present
   if (route === 'health' && !req.headers?.authorization) {
-    const supabase = getServiceClient();
     return handleHealth(req, res, supabase);
   }
 
   const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
-
-  const supabase = getServiceClient();
 
   switch (route) {
     case 'overview':  return handleOverview(req, res, supabase);

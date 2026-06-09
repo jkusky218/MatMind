@@ -1,5 +1,5 @@
 // HealthPage.jsx — System Health dashboard section
-// Polls /api/admin/?route=health every 60 seconds.
+// Polls /api/ops?route=health every 60 seconds.
 // Shows uptime %, p50/p95 latency, current status, and a 48-hour history sparkline.
 
 import { useEffect, useRef, useState } from 'react';
@@ -102,7 +102,7 @@ export default function HealthPage() {
       const token = session?.access_token;
       if (!token) throw new Error('No session');
 
-      const res = await fetch('/api/admin/?route=health', {
+      const res = await fetch('/api/ops?route=health', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
@@ -226,7 +226,7 @@ export default function HealthPage() {
         Point UptimeRobot or BetterUptime at:{' '}
         <code style={{ color: C.white, background: 'rgba(0,0,0,0.3)',
           padding: '2px 6px', borderRadius: 4 }}>
-          GET {window.location.origin}/api/admin/?route=health
+          GET {window.location.origin}/api/ops?route=health
         </code>
         <br />
         No authentication required. Returns HTTP 200 when operational, 503 when down.
