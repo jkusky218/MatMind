@@ -220,10 +220,11 @@ function TicketDetail({ ticketId, onBack }) {
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState(null);
-  const [reply,     setReply]     = useState('');
-  const [kbAnswer,  setKbAnswer]  = useState('');
-  const [showKb,    setShowKb]    = useState(false);
-  const [sending,   setSending]   = useState(false);
+  const [reply,       setReply]       = useState('');
+  const [sending,     setSending]     = useState(false);
+  // KB generation state
+  const [kbState,     setKbState]     = useState('idle'); // idle | generating | preview | saving
+  const [kbDraft,     setKbDraft]     = useState(null);   // { question, answer, category }
   const [toast,     setToast]     = useState(null);
   const threadRef = useRef(null);
 
@@ -281,15 +282,30 @@ function TicketDetail({ ticketId, onBack }) {
     finally { setSending(false); }
   }
 
-  async function handlePromoteKb() {
-    if (!kbAnswer.trim()) return;
-    setSending(true);
+  async function handleGenerateKb() {
+    setKbState('generating');
     try {
-      await apiPost({ action: 'promote-kb', ticketId, answer: kbAnswer });
-      setKbAnswer(''); setShowKb(false);
-      showToast('Added to knowledge base ✅');
-    } catch (e) { showToast(`Error: ${e.message}`); }
-    finally { setSending(false); }
+      const { draft } = await apiPost({ action: 'generate-kb', ticketId });
+      setKbDraft(draft);
+      setKbState('preview');
+    } catch (e) {
+      showToast(`Error: ${e.message}`);
+      setKbState('idle');
+    }
+  }
+
+  async function handleSaveKb() {
+    if (!kbDraft?.question?.trim() || !kbDraft?.answer?.trim()) return;
+    setKbState('saving');
+    try {
+      await apiPost({ action: 'save-kb', ticketId, ...kbDraft });
+      setKbDraft(null);
+      setKbState('idle');
+      showToast('Added to Support KB ✅');
+    } catch (e) {
+      showToast(`Error: ${e.message}`);
+      setKbState('preview');
+    }
   }
 
   if (loading) return <p style={{ color: C.muted, padding: 32 }}>Loading ticket…</p>;
@@ -403,51 +419,94 @@ function TicketDetail({ ticketId, onBack }) {
               }}>Escalate to T3</button>
             )}
 
-            <button onClick={() => setShowKb(v => !v)} style={{
-              padding: '8px 18px', borderRadius: 8,
-              border: `1px solid ${C.border}`,
-              background: 'transparent', color: C.muted,
-              fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto',
-            }}>+ Add to KB</button>
+            <button
+              onClick={handleGenerateKb}
+              disabled={kbState !== 'idle'}
+              style={{
+                padding: '8px 18px', borderRadius: 8,
+                border: `1px solid ${C.gold}55`,
+                background: 'rgba(196,164,74,0.08)', color: C.gold,
+                fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto',
+                opacity: kbState !== 'idle' ? 0.5 : 1,
+              }}
+            >
+              {kbState === 'generating' ? '✦ Generating…' : '✦ Generate KB entry'}
+            </button>
           </div>
         </div>
       )}
 
-      {/* Promote to KB panel */}
-      {showKb && (
-        <div style={{ marginTop: 12, background: C.card, borderRadius: 12, padding: '16px 18px' }}>
-          <p style={{ fontSize: 12, color: C.columbia, fontWeight: 700,
-            letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>
-            Promote resolution to Knowledge Base
-          </p>
-          <p style={{ fontSize: 12, color: C.muted, margin: '0 0 10px' }}>
-            Question: <strong style={{ color: C.white }}>{ticket.subject}</strong>
-          </p>
+      {/* AI KB preview / edit panel */}
+      {kbState === 'preview' && kbDraft && (
+        <div style={{ marginTop: 12, background: C.card, borderRadius: 12, padding: '18px 20px',
+          border: `1px solid ${C.gold}33` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <p style={{ fontSize: 12, color: C.gold, fontWeight: 700,
+              letterSpacing: '0.07em', textTransform: 'uppercase', margin: 0 }}>
+              ✦ AI-generated KB draft — review &amp; edit before saving
+            </p>
+            <select
+              value={kbDraft.category}
+              onChange={e => setKbDraft(d => ({ ...d, category: e.target.value }))}
+              style={{
+                background: '#0a1929', border: `1px solid ${C.border}`,
+                borderRadius: 6, padding: '4px 8px', color: C.white,
+                fontSize: 12, cursor: 'pointer',
+              }}
+            >
+              {['account','billing','feature','technical','legal','general'].map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <p style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase',
+            letterSpacing: '0.06em', margin: '0 0 4px' }}>Question</p>
           <textarea
-            value={kbAnswer}
-            onChange={e => setKbAnswer(e.target.value)}
-            placeholder="Write the definitive answer to add to the KB…"
-            rows={4}
+            value={kbDraft.question}
+            onChange={e => setKbDraft(d => ({ ...d, question: e.target.value }))}
+            rows={2}
             style={{
-              width: '100%', boxSizing: 'border-box',
+              width: '100%', boxSizing: 'border-box', marginBottom: 12,
               background: '#0a1929', border: `1px solid ${C.border}`,
               borderRadius: 8, padding: '10px 12px',
               color: C.white, fontSize: 13, resize: 'vertical',
-              fontFamily: 'inherit', outline: 'none', marginBottom: 10,
+              fontFamily: 'inherit', outline: 'none',
             }}
           />
+
+          <p style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase',
+            letterSpacing: '0.06em', margin: '0 0 4px' }}>Answer</p>
+          <textarea
+            value={kbDraft.answer}
+            onChange={e => setKbDraft(d => ({ ...d, answer: e.target.value }))}
+            rows={4}
+            style={{
+              width: '100%', boxSizing: 'border-box', marginBottom: 12,
+              background: '#0a1929', border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: '10px 12px',
+              color: C.white, fontSize: 13, resize: 'vertical',
+              fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handlePromoteKb} disabled={sending || !kbAnswer.trim()} style={{
-              padding: '7px 18px', borderRadius: 8, border: 'none',
+            <button onClick={handleSaveKb} disabled={kbState === 'saving'} style={{
+              padding: '7px 20px', borderRadius: 8, border: 'none',
               background: C.gold, color: '#0F2440',
               fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              opacity: sending || !kbAnswer.trim() ? 0.5 : 1,
-            }}>Save to KB</button>
-            <button onClick={() => { setShowKb(false); setKbAnswer(''); }} style={{
+              opacity: kbState === 'saving' ? 0.5 : 1,
+            }}>{kbState === 'saving' ? 'Saving…' : 'Save to KB'}</button>
+            <button onClick={handleGenerateKb} disabled={kbState === 'saving'} style={{
               padding: '7px 14px', borderRadius: 8,
               border: `1px solid ${C.border}`, background: 'transparent',
               color: C.muted, fontSize: 13, cursor: 'pointer',
-            }}>Cancel</button>
+            }}>Regenerate</button>
+            <button onClick={() => { setKbState('idle'); setKbDraft(null); }} style={{
+              padding: '7px 14px', borderRadius: 8,
+              border: `1px solid ${C.border}`, background: 'transparent',
+              color: C.muted, fontSize: 13, cursor: 'pointer',
+            }}>Discard</button>
           </div>
         </div>
       )}
