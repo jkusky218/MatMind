@@ -39,9 +39,8 @@ function detectEscalation(text) {
 
 async function loadKB(supabase) {
   const { data } = await supabase
-    .from('knowledge_base')
-    .select('question, answer')
-    .is('team_id', null)   // global MatMind KB only
+    .from('support_kb')
+    .select('question, answer, category')
     .order('created_at', { ascending: true });
   return data ?? [];
 }
@@ -50,8 +49,8 @@ async function loadKB(supabase) {
 
 function buildSystemPrompt(kbEntries) {
   const kbText = kbEntries.length > 0
-    ? kbEntries.map(e => `Q: ${e.question}\nA: ${e.answer}`).join('\n\n')
-    : 'No knowledge base entries loaded.';
+    ? kbEntries.map(e => `[${e.category ?? 'general'}] Q: ${e.question}\nA: ${e.answer}`).join('\n\n')
+    : 'No knowledge base entries loaded yet.';
 
   return `You are **MatMind Support**, the friendly and efficient help desk AI for the MatMind app. You are NOT the team's MatMind AI coach — you are a separate support persona who helps users with product questions, account issues, and technical problems.
 
