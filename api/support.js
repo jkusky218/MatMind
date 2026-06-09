@@ -135,20 +135,24 @@ export default async function handler(req, res) {
       { role: 'user', content: message },
     ];
 
-    const response = await client.messages.create({
-      model:      'claude-haiku-4-5',
-      max_tokens: 512,
-      system: [
-        {
-          type: 'text',
-          text: buildSystemPrompt(kbEntries),
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
-      messages,
-    });
-
-    replyText = response.content[0]?.text ?? '';
+    try {
+      const response = await client.messages.create({
+        model:      'claude-haiku-4-5',
+        max_tokens: 512,
+        system: [
+          {
+            type: 'text',
+            text: buildSystemPrompt(kbEntries),
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+        messages,
+      });
+      replyText = response.content[0]?.text ?? '';
+    } catch (err) {
+      console.error('[support] Claude API error:', err.message ?? err);
+      replyText = generateFallbackReply(message, kbEntries);
+    }
 
     // Check if Claude's reply contains an escalation marker
     const escMatch = replyText.match(/ESCALATE:(\{.*?\})/);

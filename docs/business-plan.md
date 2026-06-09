@@ -115,6 +115,18 @@ All support interactions feed into the CEO Dashboard (see P3 roadmap):
 - Top 10 KB misses (questions AI couldn't answer)
 - CSAT score (optional, post-MVP)
 
+### Agent Reply — Email Notification (Current)
+When a human agent replies to a ticket via the CEO Dashboard support tab, the reply is saved to the ticket's `conversation` log and a transactional email is sent to the user via SendGrid. Subject: *"MatMind Support replied to your ticket."* Body includes the reply text and a link back to the app. No separate email thread is created — replies remain ticket-bound inside the app.
+
+### Feature Enhancement: Agent Reply via In-App DM
+**Parked for future sprint.** Rather than email, agent replies could be delivered as a private direct message inside the app — surfacing in the user's support thread in real time via Supabase Realtime. This would:
+- Keep the support conversation entirely inside MatMind (no email client switching)
+- Allow the user to reply in-app, with the reply appending to the ticket conversation
+- Require a "support DM" channel type distinct from team channels, with read access scoped to the ticket owner and super_admins only
+- Depend on Phase 4 push notifications to alert the user when the agent replies
+
+**Prerequisites:** in-app DM channel model, push notification infrastructure (Phase 4), support thread UI visible to non-coach users.
+
 ---
 
 ## Tech Stack
