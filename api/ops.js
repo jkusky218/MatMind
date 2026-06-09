@@ -10,6 +10,7 @@
 //   analytics  → GET usage analytics
 //   dev        → GET commits, issues, deploys, QA report
 
+import Anthropic        from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { requireSuperAdmin } from '../src/lib/adminAuth.js';
 
@@ -157,22 +158,78 @@ async function handleSupport(req, res, supabase, admin) {
     }
     if (action==='close') { await supabase.from('support_tickets').update({ status:'resolved', resolved_at:new Date().toISOString(), resolved_by:admin.userId, updated_at:new Date().toISOString() }).eq('id',ticketId); return res.status(200).json({ ok:true }); }
     if (action==='escalate') { await supabase.from('support_tickets').update({ status:'escalated', updated_at:new Date().toISOString() }).eq('id',ticketId); return res.status(200).json({ ok:true }); }
-    if (action==='promote-kb') {
-      const { data:t } = await supabase.from('support_tickets').select('subject,category').eq('id',ticketId).single();
-      await supabase.from('knowledge_base').insert({ title:t?.subject??'Support resolution', content:answer.trim(), category:t?.category??'support', source_ticket_id:ticketId });
-      return res.status(200).json({ ok:true });
+    // ── generate-kb: ask Claude to draft a KB entry from the ticket conversation ──
+    if (action === 'generate-kb') {
+      const { data: t, error: tErr } = await supabase
+        .from('support_tickets')
+        .select('subject, category, conversation')
+        .eq('id', ticketId)
+        .single();
+      if (tErr || !t) return res.status(404).json({ error: 'Ticket not found' });
+
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+      const transcript = (t.conversation ?? [])
+        .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
+        .join('\n\n');
+
+      const client = new Anthropic({ apiKey });
+      const aiRes = await client.messages.create({
+        model:      'claude-haiku-4-5',
+        max_tokens: 512,
+        system: `You are a technical writer for MatMind, an AI-powered youth wrestling team management app.
+Your job is to distill a resolved support ticket into a clean, reusable knowledge base entry.
+Rules:
+- question: one concise sentence a user would actually type (no ticket-specific names or dates)
+- answer: 2–4 sentences, plain English, actionable, no jargon
+- category: one of account | billing | feature | technical | legal | general
+Respond with ONLY valid JSON: {"question":"...","answer":"...","category":"..."}`,
+        messages: [{
+          role: 'user',
+          content: `Ticket subject: ${t.subject ?? '(none)'}\n\nConversation:\n${transcript}`,
+        }],
+      });
+
+      let draft;
+      try {
+        draft = JSON.parse(aiRes.content[0]?.text ?? '{}');
+      } catch {
+        return res.status(500).json({ error: 'Claude returned non-JSON — try again' });
+      }
+      if (!draft.question || !draft.answer) {
+        return res.status(500).json({ error: 'Claude draft incomplete — try again' });
+      }
+      return res.status(200).json({ draft });
+    }
+
+    // ── save-kb: persist a (possibly edited) KB draft to support_kb ─────────────
+    if (action === 'save-kb') {
+      const { question, answer, category } = req.body ?? {};
+      if (!question?.trim() || !answer?.trim()) {
+        return res.status(400).json({ error: 'question and answer are required' });
+      }
+      const { error: insErr } = await supabase.from('support_kb').insert({
+        question:         question.trim(),
+        answer:           answer.trim(),
+        category:         category ?? 'general',
+        source_ticket_id: ticketId,
+        created_by:       admin.userId,
+      });
+      if (insErr) return res.status(500).json({ error: insErr.message });
+      return res.status(200).json({ ok: true });
     }
     return res.status(400).json({ error: 'Unknown action' });
   }
   const ticketId = req.query?.id;
   if (ticketId) {
-    const { data:ticket, error } = await supabase.from('support_tickets').select('*, profiles(full_name,email,role), teams(name,slug)').eq('id',ticketId).single();
+    const { data:ticket, error } = await supabase.from('support_tickets').select('*, user:user_id(full_name,email,role), teams(name,slug)').eq('id',ticketId).single();
     if(error) return res.status(404).json({ error: error.message });
     return res.status(200).json({ ticket: { ...ticket, tier:inferTier(ticket) } });
   }
   const ago7d = new Date(Date.now()-7*24*60*60*1000).toISOString();
   const [tRes,rRes] = await Promise.allSettled([
-    supabase.from('support_tickets').select('*, profiles(full_name,email), teams(name,slug)').in('status',['open','in_progress','escalated']).order('created_at',{ascending:true}),
+    supabase.from('support_tickets').select('*, user:user_id(full_name,email), teams(name,slug)').in('status',['open','in_progress','escalated']).order('created_at',{ascending:true}),
     supabase.from('support_tickets').select('status,created_at').gte('created_at',ago7d),
   ]);
   const tickets = (tRes.status==='fulfilled' ? (tRes.value.data ?? []) : []).map(t=>({...t,tier:inferTier(t)}));
