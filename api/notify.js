@@ -7,12 +7,12 @@ import { createClient } from '@supabase/supabase-js';
 
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT || 'https://mat-mind.com',
-  process.env.VITE_VAPID_PUBLIC_KEY,
+  process.env.VAPID_PUBLIC_KEY || process.env.VITE_VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY,
 );
 
 function makeAdminClient() {
-  const url = process.env.VITE_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Supabase admin credentials not configured');
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });

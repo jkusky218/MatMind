@@ -95,7 +95,7 @@ export default async function handler(req, res) {
   // Top-level try/catch: never let an unhandled exception return a raw 500.
   // Any crash at any step falls through to the fallback reply so the UI stays usable.
   try {
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const apiKey      = process.env.ANTHROPIC_API_KEY;
 
