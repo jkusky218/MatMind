@@ -11,7 +11,7 @@
 //   dev        → GET commits, issues, deploys, QA report
 
 import { createClient } from '@supabase/supabase-js';
-import { requireSuperAdmin } from '../../src/lib/adminAuth.js';
+import { requireSuperAdmin } from '../src/lib/adminAuth.js';
 
 function getServiceClient() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
