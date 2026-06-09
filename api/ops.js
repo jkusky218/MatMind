@@ -254,16 +254,21 @@ export default async function handler(req, res) {
 
   const route = req.query?.route;
 
+  let supabase;
+  try {
+    supabase = getServiceClient();
+  } catch (err) {
+    console.error('[ops] service client init failed:', err.message);
+    return res.status(500).json({ error: `Server config error: ${err.message}` });
+  }
+
   // Health endpoint is public (for uptime monitors) when no auth header present
   if (route === 'health' && !req.headers?.authorization) {
-    const supabase = getServiceClient();
     return handleHealth(req, res, supabase);
   }
 
   const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
-
-  const supabase = getServiceClient();
 
   switch (route) {
     case 'overview':  return handleOverview(req, res, supabase);
