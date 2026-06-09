@@ -93,123 +93,142 @@ export default async function handler(req, res) {
   const { message, conversationHistory = [], teamId, userId } = req.body ?? {};
   if (!message?.trim()) return res.status(400).json({ error: 'message is required' });
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const apiKey      = process.env.ANTHROPIC_API_KEY;
+  // Top-level try/catch: never let an unhandled exception return a raw 500.
+  // Any crash at any step falls through to the fallback reply so the UI stays usable.
+  try {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const apiKey      = process.env.ANTHROPIC_API_KEY;
 
-  // ── Step 1: coach-topic check — out of scope, return immediately, no ticket ──
-  if (COACH_TOPIC_PATTERN.test(message)) {
-    return res.status(200).json({
-      reply:      "That's not something MatMind Support can help with. Please contact your coach directly.",
-      escalated:  false,
-      coachDefer: true,
-      ticketId:   null,
-    });
-  }
-
-  // ── Step 2: immediate local escalation check (before calling Claude) ─────────
-  const escalationCheck = detectEscalation(message);
-
-  // ── Step 2: load KB (skip if no Supabase configured) ────────────────────────
-  let kbEntries = [];
-  let supabase  = null;
-
-  if (supabaseUrl && serviceKey) {
-    supabase = createClient(supabaseUrl, serviceKey);
-    kbEntries = await loadKB(supabase);
-  }
-
-  // ── Step 3: call Claude if API key is available ──────────────────────────────
-  let replyText    = null;
-  let shouldEscalate = escalationCheck.escalate;
-  let escalationMeta = escalationCheck;
-
-  if (apiKey) {
-    const client = new Anthropic({ apiKey });
-
-    const messages = [
-      ...conversationHistory.slice(-10).map(m => ({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.content,
-      })),
-      { role: 'user', content: message },
-    ];
-
-    try {
-      const response = await client.messages.create({
-        model:      'claude-haiku-4-5',
-        max_tokens: 512,
-        system: [
-          {
-            type: 'text',
-            text: buildSystemPrompt(kbEntries),
-            cache_control: { type: 'ephemeral' },
-          },
-        ],
-        messages,
+    // ── Step 1: coach-topic check — out of scope, return immediately, no ticket ──
+    if (COACH_TOPIC_PATTERN.test(message)) {
+      return res.status(200).json({
+        reply:      "That's not something MatMind Support can help with. Please contact your coach directly.",
+        escalated:  false,
+        coachDefer: true,
+        ticketId:   null,
       });
-      replyText = response.content[0]?.text ?? '';
-    } catch (err) {
-      console.error('[support] Claude API error:', err.message ?? err);
+    }
+
+    // ── Step 2: immediate local escalation check (before calling Claude) ─────────
+    const escalationCheck = detectEscalation(message);
+
+    // ── Step 2: load KB (skip if no Supabase configured) ────────────────────────
+    let kbEntries = [];
+    let supabase  = null;
+
+    if (supabaseUrl && serviceKey) {
+      supabase = createClient(supabaseUrl, serviceKey);
+      try {
+        kbEntries = await loadKB(supabase);
+      } catch (err) {
+        console.error('[support] KB load error:', err.message ?? err);
+        // continue without KB entries
+      }
+    }
+
+    // ── Step 3: call Claude if API key is available ──────────────────────────────
+    let replyText    = null;
+    let shouldEscalate = escalationCheck.escalate;
+    let escalationMeta = escalationCheck;
+
+    if (apiKey) {
+      const client = new Anthropic({ apiKey });
+
+      const messages = [
+        ...conversationHistory.slice(-10).map(m => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.content,
+        })),
+        { role: 'user', content: message },
+      ];
+
+      try {
+        const response = await client.messages.create({
+          model:      'claude-haiku-4-5',
+          max_tokens: 512,
+          system: [
+            {
+              type: 'text',
+              text: buildSystemPrompt(kbEntries),
+              cache_control: { type: 'ephemeral' },
+            },
+          ],
+          messages,
+        });
+        replyText = response.content[0]?.text ?? '';
+      } catch (err) {
+        console.error('[support] Claude API error:', err.message ?? err);
+        replyText = generateFallbackReply(message, kbEntries);
+      }
+
+      // Check if Claude's reply contains an escalation marker
+      const escMatch = replyText.match(/ESCALATE:(\{.*?\})/);
+      if (escMatch) {
+        try {
+          const parsed = JSON.parse(escMatch[1]);
+          shouldEscalate = true;
+          escalationMeta = { escalate: true, ...parsed };
+        } catch {}
+        // Strip the marker from the user-visible reply
+        replyText = replyText.replace(/\nESCALATE:\{.*?\}/g, '').trim();
+      }
+    } else {
+      // No API key — generate a basic fallback reply
       replyText = generateFallbackReply(message, kbEntries);
     }
 
-    // Check if Claude's reply contains an escalation marker
-    const escMatch = replyText.match(/ESCALATE:(\{.*?\})/);
-    if (escMatch) {
+    // ── Step 4: create/update ticket in Supabase if needed ───────────────────────
+    let ticketId = req.body.ticketId ?? null;
+
+    if (supabase && userId) {
+      const newMessage = { role: 'user', content: message, ts: new Date().toISOString() };
+      const aiMessage  = { role: 'assistant', content: replyText, ts: new Date().toISOString() };
+      const appendMsgs = [newMessage, aiMessage];
+
       try {
-        const parsed = JSON.parse(escMatch[1]);
-        shouldEscalate = true;
-        escalationMeta = { escalate: true, ...parsed };
-      } catch {}
-      // Strip the marker from the user-visible reply
-      replyText = replyText.replace(/\nESCALATE:\{.*?\}/g, '').trim();
+        if (!ticketId) {
+          // Create a new ticket (T2 or T3)
+          const subject = message.slice(0, 80) + (message.length > 80 ? '…' : '');
+          const { data: ticket } = await supabase
+            .from('support_tickets')
+            .insert({
+              team_id:      teamId ?? null,
+              user_id:      userId,
+              subject,
+              conversation: appendMsgs,
+              status:       shouldEscalate ? 'escalated' : 'open',
+              severity:     escalationMeta.severity ?? 'low',
+              category:     escalationMeta.category ?? 'general',
+            })
+            .select('id')
+            .single();
+          ticketId = ticket?.id ?? null;
+        } else {
+          // Append to existing ticket conversation
+          await supabase.rpc('append_support_messages', {
+            p_ticket_id: ticketId,
+            p_messages:  appendMsgs,
+            p_status:    shouldEscalate ? 'escalated' : 'in_progress',
+          });
+        }
+      } catch (err) {
+        console.error('[support] ticket write error:', err.message ?? err);
+        // non-fatal: reply still goes back to user, ticket just wasn't persisted
+      }
     }
-  } else {
-    // No API key — generate a basic fallback reply
-    replyText = generateFallbackReply(message, kbEntries);
+
+    return res.status(200).json({
+      reply:     replyText,
+      escalated: shouldEscalate,
+      ticketId,
+    });
+
+  } catch (err) {
+    // Last-resort catch: log and return a JSON 500 (never raw HTML)
+    console.error('[support] unhandled error:', err.message ?? err);
+    return res.status(500).json({ error: 'Support service unavailable. Please try again.' });
   }
-
-  // ── Step 4: create/update ticket in Supabase if needed ───────────────────────
-  let ticketId = req.body.ticketId ?? null;
-
-  if (supabase && userId) {
-    const newMessage = { role: 'user', content: message, ts: new Date().toISOString() };
-    const aiMessage  = { role: 'assistant', content: replyText, ts: new Date().toISOString() };
-    const appendMsgs = [newMessage, aiMessage];
-
-    if (!ticketId) {
-      // Create a new ticket (T2 or T3)
-      const subject = message.slice(0, 80) + (message.length > 80 ? '…' : '');
-      const { data: ticket } = await supabase
-        .from('support_tickets')
-        .insert({
-          team_id:      teamId ?? null,
-          user_id:      userId,
-          subject,
-          conversation: appendMsgs,
-          status:       shouldEscalate ? 'escalated' : 'open',
-          severity:     escalationMeta.severity ?? 'low',
-          category:     escalationMeta.category ?? 'general',
-        })
-        .select('id')
-        .single();
-      ticketId = ticket?.id ?? null;
-    } else {
-      // Append to existing ticket conversation
-      await supabase.rpc('append_support_messages', {
-        p_ticket_id: ticketId,
-        p_messages:  appendMsgs,
-        p_status:    shouldEscalate ? 'escalated' : 'in_progress',
-      });
-    }
-  }
-
-  return res.status(200).json({
-    reply:     replyText,
-    escalated: shouldEscalate,
-    ticketId,
-  });
 }
 
 // ── Fallback when no API key (demo / unconfigured) ───────────────────────────
