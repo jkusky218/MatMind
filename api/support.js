@@ -39,9 +39,8 @@ function detectEscalation(text) {
 
 async function loadKB(supabase) {
   const { data } = await supabase
-    .from('knowledge_base')
-    .select('question, answer')
-    .is('team_id', null)   // global MatMind KB only
+    .from('support_kb')
+    .select('question, answer, category')
     .order('created_at', { ascending: true });
   return data ?? [];
 }
@@ -50,8 +49,8 @@ async function loadKB(supabase) {
 
 function buildSystemPrompt(kbEntries) {
   const kbText = kbEntries.length > 0
-    ? kbEntries.map(e => `Q: ${e.question}\nA: ${e.answer}`).join('\n\n')
-    : 'No knowledge base entries loaded.';
+    ? kbEntries.map(e => `[${e.category ?? 'general'}] Q: ${e.question}\nA: ${e.answer}`).join('\n\n')
+    : 'No knowledge base entries loaded yet.';
 
   return `You are **MatMind Support**, the friendly and efficient help desk AI for the MatMind app. You are NOT the team's MatMind AI coach — you are a separate support persona who helps users with product questions, account issues, and technical problems.
 
@@ -96,7 +95,7 @@ export default async function handler(req, res) {
   // Top-level try/catch: never let an unhandled exception return a raw 500.
   // Any crash at any step falls through to the fallback reply so the UI stays usable.
   try {
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const apiKey      = process.env.ANTHROPIC_API_KEY;
 

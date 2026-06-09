@@ -90,21 +90,44 @@ The AI must immediately create a human-reviewed ticket when any of the following
 - **Explicit request** — user says "I want to talk to a person" or equivalent
 
 ### Knowledge Base
-- The support AI's context includes a product knowledge base covering features, FAQs, and known issues.
-- When a human resolves a T3 ticket, the resolution is reviewed and optionally added back to the KB — the KB grows from real support interactions.
-- The KB is separate from the team-specific KB (F08) used by the team AI for roster/FAQ context.
+
+#### Architecture
+The support KB is **global to MatMind the product** — not scoped to any team. This is intentional: "how do I reset my password" has the same answer regardless of which team is asking. Team-specific knowledge (tournament schedules, roster policies, coach FAQs) stays in the separate `knowledge_base` table used by the team AI.
+
+| Table | Scope | Used by |
+|-------|-------|---------|
+| `support_kb` | Global (no team_id) | MatMind Support AI |
+| `knowledge_base` | Per-team | Team's MatMind AI coach |
+
+#### AI-Assisted KB Generation
+When an agent resolves a ticket in the CEO Dashboard, a **"✦ Generate KB entry"** button sends the full ticket conversation to Claude Haiku. Claude synthesizes the exchange into a clean, reusable Q&A pair with a category tag (`account`, `billing`, `feature`, `technical`, `legal`, `general`). The agent reviews the draft, edits if needed, and saves it — the entry is immediately available to the support AI for all future conversations across all tenants.
+
+**The feedback loop:**
+1. User asks a question the AI can't fully answer → ticket created
+2. Agent resolves the ticket
+3. Agent clicks "Generate KB entry" → Claude drafts Q+A from the conversation
+4. Agent reviews, edits, saves to `support_kb`
+5. Next user who asks a similar question gets an instant T1 AI answer drawn from the KB
+
+#### KB Growth Strategy
+At launch the KB starts empty and the support AI falls back to general product knowledge. The KB is deliberately seeded from real support interactions rather than pre-written — this ensures entries reflect actual user language and actual pain points, not assumed ones. Target state: 50+ entries covering the most common question categories within the first 90 days of operation.
+
+Categories to prioritize at launch:
+- **Account** — login, magic link, password reset, role changes
+- **Billing** — subscription tiers, payment issues, refund policy
+- **Feature** — how roster, schedule, AI commands, and channels work
+- **Technical** — PWA install, push notifications, offline behavior
 
 ### Support Data Model
 ```
 support_tickets
-  id, team_id, user_id, status (open|pending|resolved|escalated),
-  tier (1|2|3), subject, created_at, resolved_at, resolved_by
-
-support_messages
-  id, ticket_id, sender_type (user|ai|human_agent), body, created_at
+  id, team_id, user_id, status (open|in_progress|resolved|escalated),
+  severity (low|medium|high|critical), category, subject,
+  conversation (JSONB), created_at, resolved_at, resolved_by
 
 support_kb
-  id, question, answer, source_ticket_id, created_at, updated_at
+  id, question, answer, category, source_ticket_id,
+  created_by, created_at, updated_at
 ```
 
 ### Support Metrics → CEO Dashboard

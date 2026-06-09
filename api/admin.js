@@ -5,7 +5,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 function makeAdminClient() {
-  const url = process.env.VITE_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Admin credentials not configured (SUPABASE_SERVICE_ROLE_KEY missing)');
   return createClient(url, key, {
