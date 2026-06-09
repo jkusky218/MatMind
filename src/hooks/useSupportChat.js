@@ -166,7 +166,8 @@ export function useSupportChat({ auth }) {
         time:      'Now',
       };
       setMessages(prev => [...prev, aiMsg]);
-    } catch {
+    } catch (err) {
+      console.error('[SupportChat] error:', err);
       setMessages(prev => [...prev, {
         id:     Date.now() + 1,
         role:   'support',
