@@ -175,7 +175,7 @@ async function handleSupport(req, res, supabase, admin) {
     supabase.from('support_tickets').select('*, profiles(full_name,email), teams(name,slug)').in('status',['open','in_progress','escalated']).order('created_at',{ascending:true}),
     supabase.from('support_tickets').select('status,created_at').gte('created_at',ago7d),
   ]);
-  const tickets = (tRes.status==='fulfilled'?tRes.value.data??[]).map(t=>({...t,tier:inferTier(t)}));
+  const tickets = (tRes.status==='fulfilled' ? (tRes.value.data ?? []) : []).map(t=>({...t,tier:inferTier(t)}));
   const recent  = rRes.status==='fulfilled' ? (rRes.value.data??[]) : [];
   const byTier  = {T1:0,T2:0,T3:0};
   for(const t of tickets) byTier[t.tier]=(byTier[t.tier]??0)+1;
