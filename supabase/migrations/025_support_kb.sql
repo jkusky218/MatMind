@@ -26,20 +26,8 @@ DO $$ BEGIN
     SELECT 1 FROM pg_policies WHERE tablename = 'support_kb' AND policyname = 'support_kb_super_admin'
   ) THEN
     CREATE POLICY "support_kb_super_admin" ON support_kb
-      USING (
-        EXISTS (
-          SELECT 1 FROM super_admins sa
-          INNER JOIN profiles p ON p.id = sa.profile_id
-          WHERE p.id = auth.uid()
-        )
-      )
-      WITH CHECK (
-        EXISTS (
-          SELECT 1 FROM super_admins sa
-          INNER JOIN profiles p ON p.id = sa.profile_id
-          WHERE p.id = auth.uid()
-        )
-      );
+      USING (EXISTS (SELECT 1 FROM super_admins WHERE user_id = auth.uid()))
+      WITH CHECK (EXISTS (SELECT 1 FROM super_admins WHERE user_id = auth.uid()));
   END IF;
 END $$;
 
