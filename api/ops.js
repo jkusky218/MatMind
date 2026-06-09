@@ -166,13 +166,13 @@ async function handleSupport(req, res, supabase, admin) {
   }
   const ticketId = req.query?.id;
   if (ticketId) {
-    const { data:ticket, error } = await supabase.from('support_tickets').select('*, profiles(full_name,email,role), teams(name,slug)').eq('id',ticketId).single();
+    const { data:ticket, error } = await supabase.from('support_tickets').select('*, user:user_id(full_name,email,role), teams(name,slug)').eq('id',ticketId).single();
     if(error) return res.status(404).json({ error: error.message });
     return res.status(200).json({ ticket: { ...ticket, tier:inferTier(ticket) } });
   }
   const ago7d = new Date(Date.now()-7*24*60*60*1000).toISOString();
   const [tRes,rRes] = await Promise.allSettled([
-    supabase.from('support_tickets').select('*, profiles(full_name,email), teams(name,slug)').in('status',['open','in_progress','escalated']).order('created_at',{ascending:true}),
+    supabase.from('support_tickets').select('*, user:user_id(full_name,email), teams(name,slug)').in('status',['open','in_progress','escalated']).order('created_at',{ascending:true}),
     supabase.from('support_tickets').select('status,created_at').gte('created_at',ago7d),
   ]);
   const tickets = (tRes.status==='fulfilled' ? (tRes.value.data ?? []) : []).map(t=>({...t,tier:inferTier(t)}));

@@ -196,7 +196,7 @@ function SupportQueue({ onSelect }) {
                 {/* User + team */}
                 <div style={{ fontSize: 12, color: C.muted, textAlign: 'right',
                   flexShrink: 0, minWidth: 140 }}>
-                  <p style={{ margin: 0, color: C.white }}>{ticket.profiles?.full_name ?? 'Unknown'}</p>
+                  <p style={{ margin: 0, color: C.white }}>{ticket.user?.full_name ?? 'Unknown'}</p>
                   <p style={{ margin: 0 }}>{ticket.teams?.name ?? 'No team'}</p>
                 </div>
 
@@ -300,7 +300,7 @@ function TicketDetail({ ticketId, onBack }) {
   const isResolved = ticket.status === 'resolved';
 
   const ROLE_STYLE = {
-    user:  { align: 'flex-start', bg: 'rgba(107,173,228,0.12)', color: C.white,   label: ticket.profiles?.full_name ?? 'User' },
+    user:  { align: 'flex-start', bg: 'rgba(107,173,228,0.12)', color: C.white,   label: ticket.user?.full_name ?? 'User' },
     ai:    { align: 'flex-start', bg: 'rgba(196,164,74,0.1)',   color: C.gold,    label: 'MatMind Support AI' },
     agent: { align: 'flex-end',   bg: 'rgba(82,201,124,0.12)',  color: C.green,   label: 'You (agent)' },
   };
@@ -324,7 +324,7 @@ function TicketDetail({ ticketId, onBack }) {
             {ticket.subject || 'No subject'}
           </h1>
           <p style={{ fontSize: 12, color: C.muted, margin: '4px 0 0' }}>
-            {ticket.profiles?.full_name} · {ticket.profiles?.email} ·{' '}
+            {ticket.user?.full_name} · {ticket.user?.email} ·{' '}
             {ticket.teams?.name ?? 'No team'} · opened {timeAgo(ticket.created_at)}
           </p>
         </div>
