@@ -109,7 +109,7 @@ function TenantList({ onSelect }) {
   const [error,   setError]   = useState(null);
 
   useEffect(() => {
-    apiFetch('/api/admin/?route=tenants')
+    apiFetch('/api/ops?route=tenants')
       .then(d => setTeams(d.teams ?? []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -219,7 +219,7 @@ function TenantDetail({ teamId, onBack }) {
   const [toasting, setToasting] = useState(null);
 
   useEffect(() => {
-    apiFetch(`/api/admin/?route=tenants&id=${teamId}`)
+    apiFetch(`/api/ops?route=tenants&id=${teamId}`)
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -236,7 +236,7 @@ function TenantDetail({ teamId, onBack }) {
       onConfirm: async () => {
         setConfirm(null);
         try {
-          await apiPost('/api/admin/?route=tenants', { teamId, active: false });
+          await apiPost('/api/ops?route=tenants', { teamId, active: false });
           setData(prev => ({ ...prev, team: { ...prev.team, active: false } }));
           toast('Team deactivated');
         } catch (e) { toast(`Error: ${e.message}`); }
@@ -246,7 +246,7 @@ function TenantDetail({ teamId, onBack }) {
 
   async function handleReactivate() {
     try {
-      await apiPost('/api/admin/?route=tenants', { teamId, active: true });
+      await apiPost('/api/ops?route=tenants', { teamId, active: true });
       setData(prev => ({ ...prev, team: { ...prev.team, active: true } }));
       toast('Team reactivated');
     } catch (e) { toast(`Error: ${e.message}`); }
